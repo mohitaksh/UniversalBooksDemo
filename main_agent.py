@@ -28,6 +28,8 @@ from livekit.agents import (
     JobContext,
     WorkerOptions,
     UserStateChangedEvent,
+    UserInputTranscribedEvent,
+    ConversationItemAddedEvent,
     cli,
     llm,
     Agent,
@@ -952,15 +954,24 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             full_log.error(f"Metrics hook error: {e}")
 
-    @session.on("agent_speech_committed")
-    def on_agent_speech(msg):
-        if msg and msg.content:
-            transcript_log.info(f"Agent: {msg.content}")
+    @session.on("conversation_item_added")
+    def on_conversation_item(ev: ConversationItemAddedEvent):
+        """Log every committed user/agent message to the transcript."""
+        item = ev.item
+        role = str(item.role).split(".")[-1].capitalize()  # "User" or "Assistant"
+        text = item.text_content
+        if text:
+            label = "User" if "user" in role.lower() else "Agent"
+            transcript_log.info(f"{label}: {text}")
+            full_log.info(f"💬 [{label}] {text}")
 
-    @session.on("user_speech_committed")
-    def on_user_speech(msg):
-        if msg and msg.content:
-            transcript_log.info(f"User: {msg.content}")
+    @session.on("user_input_transcribed")
+    def on_user_transcribed(ev: UserInputTranscribedEvent):
+        """Log interim/final STT results for debugging."""
+        if ev.is_final:
+            brief_log.info(f"STT_FINAL | {ev.transcript}")
+        else:
+            full_log.info(f"🎤 STT interim: {ev.transcript}")
 
     # ── Silence detection ────────────────────────────────────────
     # If user doesn't speak for 10s, auto-transfer to ReEngagerAgent.
