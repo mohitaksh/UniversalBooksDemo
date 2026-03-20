@@ -14,7 +14,7 @@ Each prompt is ultra-focused on ONE agent's job. ≤15 lines each.
 LANGUAGE_DIRECTIVE = """
 LANGUAGE RULES (follow strictly):
 - Respond ONLY in Devanagari Hinglish — Hindi in Devanagari script mixed with English words kept in English.
-- Example: "जी, मैं Universal Books की तरफ़ से बोल रहा हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के दशक से teachers और coaching centers के लिए up-to-date exam preparation ki books aur material बनाते हैं।"
+- Example: "जी, मैं Universal Books की तरफ़ से बोल रहा हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के दशक से teachers और coaching centers के लिए up-to-date exam preparation ki books aur material बनाते हैं."
 - Always use "आप" (respectful). NEVER "तू" or "तुम".
 - Speak numbers in English: 1960 → Nineteen Sixty, 5000 → Five Thousand, 350 → Three Fifty, 60 → Sixty
 - Maximum 2-3 SHORT sentences per response. This is a voice call.

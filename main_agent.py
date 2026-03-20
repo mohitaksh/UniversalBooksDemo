@@ -38,7 +38,7 @@ from livekit.agents import (
 )
 from livekit.agents.voice import RunContext
 
-from livekit.plugins import sarvam, anthropic
+from livekit.plugins import sarvam, aws
 import livekit.plugins.groq as groq
 
 from prompts import (
@@ -880,9 +880,8 @@ async def entrypoint(ctx: JobContext):
     userdata.personas = agents
 
     # ── Plugins ──────────────────────────────────────────────────
-    llm_plugin = anthropic.LLM(
-        model="claude-haiku-4-5-20251001",
-        api_key=os.getenv("ANTHROPIC_API_KEY"),
+    llm_plugin = aws.LLM(
+        model="anthropic.claude-3-5-haiku-20241022-v1:0",
     )
 
     stt_plugin = sarvam.STT(

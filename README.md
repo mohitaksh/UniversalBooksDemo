@@ -15,7 +15,7 @@ A multi-agent voice AI system for making outbound sales calls to tutors, teacher
 | Closing | GracefulCloserAgent, HostileExitAgent |
 | Edge Cases | WrongNumberAgent, ReEngagerAgent |
 
-**Tech Stack:** Claude Haiku (LLM) · Sarvam Saaras v3 (STT) · Sarvam Bulbul v3 (TTS) · LiveKit SIP · FastAPI · N8N webhooks
+**Tech Stack:** Claude Haiku via AWS Bedrock (LLM) · Sarvam Saaras v3 (STT) · Sarvam Bulbul v3 (TTS) · LiveKit SIP · FastAPI · N8N webhooks
 
 ---
 
@@ -25,16 +25,16 @@ A multi-agent voice AI system for making outbound sales calls to tutors, teacher
 
 **Ubuntu / EC2:**
 ```bash
-git clone https://github.com/your-repo/UniversalBooks.git
-cd UniversalBooks
+git clone https://github.com/mohitaksh/UniversalBooksDemo.git
+cd UniversalBooksDemo
 chmod +x install_ubuntu.sh
 ./install_ubuntu.sh
 ```
 
 **Windows:**
 ```cmd
-git clone https://github.com/your-repo/UniversalBooks.git
-cd UniversalBooks
+git clone https://github.com/mohitaksh/UniversalBooksDemo.git
+cd UniversalBooksDemo
 install_windows.bat
 ```
 
@@ -44,7 +44,7 @@ Edit `.env.local` with your API keys (created from `.env.example` during install
 ```
 LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET
 SIP_OUTBOUND_TRUNK_ID
-ANTHROPIC_API_KEY
+AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
 SARVAM_API_KEY
 N8N_WHATSAPP_WEBHOOK_URL (+ SMS, CALLBACK, EMAIL)
 ```
