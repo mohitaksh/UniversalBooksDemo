@@ -8,9 +8,9 @@ USD_TO_INR               = 92.0  # Approx
 PRICE_TTS_PER_10K_CHARS  = 30.0  # INR
 PRICE_STT_PER_MIN        = 0.50  # INR
 
-# Claude 3.5 Haiku via AWS Bedrock ($0.80 input, $4.00 output per 1M tokens)
-PRICE_LLM_INPUT_PER_1M   = 1.25  # USD
-PRICE_LLM_OUTPUT_PER_1M  = 5.00  # USD
+# Claude Sonnet 4.5 via AWS Bedrock ($3.00 input, $15.00 output per 1M tokens)
+PRICE_LLM_INPUT_PER_1M   = 3.00  # USD
+PRICE_LLM_OUTPUT_PER_1M  = 15.00  # USD
 
 # ─────────────────────────────────────────────────────────────────
 # CALLER INFO
