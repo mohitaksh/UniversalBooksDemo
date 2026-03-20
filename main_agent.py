@@ -881,8 +881,8 @@ async def entrypoint(ctx: JobContext):
 
     # ── Plugins ──────────────────────────────────────────────────
     llm_plugin = aws.LLM(
-        model="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        region="us-east-1"
+        model="anthropic.claude-sonnet-4-6",
+        region="ap-south-1"
     )
 
     stt_plugin = sarvam.STT(
