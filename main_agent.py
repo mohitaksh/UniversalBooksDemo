@@ -886,8 +886,9 @@ async def entrypoint(ctx: JobContext):
     )
 
     stt_plugin = sarvam.STT(
-        language="en-IN",
+        language="hi-IN",
         model="saaras:v3",
+        mode="codemix",
     )
 
     tts_plugin = sarvam.TTS(
