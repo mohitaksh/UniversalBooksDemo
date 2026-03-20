@@ -881,7 +881,7 @@ async def entrypoint(ctx: JobContext):
 
     # ── Plugins ──────────────────────────────────────────────────
     llm_plugin = aws.LLM(
-        model="ap.anthropic.claude-sonnet-4-6",
+        model="global.anthropic.claude-sonnet-4-6",
         region="ap-south-1"
     )
 
