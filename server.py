@@ -2,6 +2,7 @@ import os
 import json
 import asyncio
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -15,6 +16,14 @@ logger = logging.getLogger("server")
 load_dotenv(dotenv_path=".env.local")
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class CallRequest(BaseModel):
     phone_number: str
