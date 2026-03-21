@@ -43,7 +43,7 @@ import livekit.plugins.groq as groq
 
 from prompts import (
     IDENTITY_CONFIRMER_PROMPT, GATEKEEPER_PROMPT, HOLD_WAITER_PROMPT,
-    INTRO_PROMPT, NEEDS_ASSESSOR_PROMPT, EXAM_PITCHER_PROMPT, CLOSING_PITCHER_PROMPT,
+    INTRO_PROMPT, PITCH_PROMPT, NEEDS_ASSESSOR_PROMPT, EXAM_PITCHER_PROMPT, CLOSING_PITCHER_PROMPT,
     OWN_MATERIAL_PROMPT, PRICE_HANDLER_PROMPT, NOT_INTERESTED_PROMPT, THINK_ABOUT_IT_PROMPT,
     MATERIAL_SENDER_PROMPT, EMAIL_COLLECTOR_PROMPT, BUSY_SCHEDULER_PROMPT, TEAM_CONNECT_PROMPT,
     GRACEFUL_CLOSER_PROMPT, HOSTILE_EXIT_PROMPT, WRONG_NUMBER_PROMPT, REENGAGER_PROMPT,
@@ -160,9 +160,9 @@ class GreeterAgent(BaseAgent):
         await asyncio.sleep(5.0)  # SIP audio establishment delay
 
         if self.call_type == "institution":
-            opener = f"नमस्ते, मेरा नाम अमित है, मैं Universal Books से बोल रहा हूँ, हम एक book publishing company हैं जो coaching centers के लिए exam preparation books print करते हैं। क्या आपसे 30 second बात कर सकता हूँ?"
+            opener = f"Hello, क्या ये number {self.caller_name} का है?"
         else:
-            opener = f"नमस्ते {self.caller_name} जी, मेरा नाम अमित है, मैं Universal Books से बोल रहा हूँ, हम एक book publishing company हैं जो tuitions के लिए books print करते हैं। क्या आपसे 30 second बात कर सकता हूँ?"
+            opener = f"Hello, क्या मेरी बात {self.caller_name} से हो रही है जो tuition पढ़ाते हैं?"
 
         await self.session.say(opener)
 
@@ -297,10 +297,77 @@ class HoldWaiterAgent(BaseAgent):
 # ═════════════════════════════════════════════════════════════════
 
 class IntroAgent(BaseAgent):
-    """Delivers the Universal Books introduction pitch."""
+    """Hardcoded 1-minute ask, then LLM handles permission response."""
 
     def __init__(self):
         super().__init__(instructions=INTRO_PROMPT)
+
+    async def on_enter(self) -> None:
+        userdata: CallUserData = self.session.userdata
+        if userdata.brief_log:
+            userdata.brief_log.info("AGENT_ENTER | IntroAgent")
+
+        intro_ask = (
+            "जी, मेरा नाम अमित है, मैं Universal Books से बोल रहा हूँ, "
+            "हम एक book publishing company हैं। "
+            "आपसे कुछ बात करनी थी, क्या आप मुझे call पर बस 1 minute दे सकते हैं?"
+        )
+        await self.session.say(intro_ask)
+
+    @function_tool
+    async def transfer_to_pitch(self, context: RunCtx) -> Agent:
+        """Transfer when caller gives permission to speak for 1 minute."""
+        return await self._transfer_to("pitch", context)
+
+    @function_tool
+    async def transfer_to_busy_scheduler(self, context: RunCtx) -> Agent:
+        """Transfer when caller says they are busy."""
+        return await self._transfer_to("busy_scheduler", context)
+
+    @function_tool
+    async def transfer_to_hostile_exit(self, context: RunCtx) -> Agent:
+        """Transfer when caller is hostile."""
+        return await self._transfer_to("hostile_exit", context)
+
+    @function_tool
+    async def transfer_to_not_interested(self, context: RunCtx) -> Agent:
+        """Transfer when caller says not interested."""
+        return await self._transfer_to("not_interested", context)
+
+    @function_tool
+    async def transfer_to_graceful_closer(self, context: RunCtx) -> Agent:
+        """Transfer to close when they refuse."""
+        return await self._transfer_to("graceful_closer", context)
+
+
+class PitchAgent(BaseAgent):
+    """Hardcoded full pitch, then LLM handles reactions."""
+
+    def __init__(self):
+        super().__init__(instructions=PITCH_PROMPT)
+
+    async def on_enter(self) -> None:
+        userdata: CallUserData = self.session.userdata
+        if userdata.brief_log:
+            userdata.brief_log.info("AGENT_ENTER | PitchAgent")
+
+        full_pitch = (
+            "जी जैसा कि मैंने बताया मैं Universal Books से बोल रहा हूँ, "
+            "हम एक book publishing company हैं जो coaching centers के लिए "
+            "exam preparation books print करते हैं। "
+            "हम साठ सालों से, मतलब की Nineteen Sixty के दशक से "
+            "teachers और coaching centers के लिए up-to-date exam preparation "
+            "की books और material बनाते हैं। "
+            "हम NEET, J double E, C B S E Boards और बाकी कई exams के लिए "
+            "study material बनाते हैं। "
+            "हमारे material पर आपके institute की branding लगती है — "
+            "और इस branding का कोई extra charge नहीं होता। "
+            "इससे आपको कभी study material की tension नहीं होती, "
+            "और आपके students को हमेशा updated material मिलता रहता है। "
+            "हम जानना चाहते हैं कि क्या आप इस बारे में हमारी team से "
+            "बात करना पसंद करेंगे?"
+        )
+        await self.session.say(full_pitch)
 
     @function_tool
     async def transfer_to_needs_assessor(self, context: RunCtx) -> Agent:
@@ -336,6 +403,16 @@ class IntroAgent(BaseAgent):
     async def transfer_to_think_about_it(self, context: RunCtx) -> Agent:
         """Transfer when caller says they'll think about it."""
         return await self._transfer_to("think_about_it", context)
+
+    @function_tool
+    async def transfer_to_team_connect(self, context: RunCtx) -> Agent:
+        """Transfer when caller wants to talk to the team."""
+        return await self._transfer_to("team_connect", context)
+
+    @function_tool
+    async def transfer_to_hostile_exit(self, context: RunCtx) -> Agent:
+        """Transfer when caller is hostile."""
+        return await self._transfer_to("hostile_exit", context)
 
 
 class NeedsAssessorAgent(BaseAgent):
@@ -861,6 +938,7 @@ async def entrypoint(ctx: JobContext):
         "gatekeeper": GatekeeperAgent(caller_name=caller_name),
         "hold_waiter": HoldWaiterAgent(),
         "intro": IntroAgent(),
+        "pitch": PitchAgent(),
         "needs_assessor": NeedsAssessorAgent(),
         "exam_pitcher": ExamPitcherAgent(),
         "closing_pitcher": ClosingPitcherAgent(),
