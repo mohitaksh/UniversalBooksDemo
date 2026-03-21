@@ -160,9 +160,9 @@ class GreeterAgent(BaseAgent):
         await asyncio.sleep(5.0)  # SIP audio establishment delay
 
         if self.call_type == "institution":
-            opener = f"Hello, क्या आप {self.caller_name} से बोल रहे हैं?"
+            opener = f"नमस्ते, मेरा नाम अमित है, मैं Universal Books से बोल रहा हूँ, हम एक book publishing company हैं जो coaching centers के लिए exam preparation books print करते हैं। क्या आपसे 30 second बात कर सकता हूँ?"
         else:
-            opener = f"Hello, क्या आप {self.caller_name} जी बोल रहे हैं जो tuition पढ़ाते हैं?"
+            opener = f"नमस्ते {self.caller_name} जी, मेरा नाम अमित है, मैं Universal Books से बोल रहा हूँ, हम एक book publishing company हैं जो tuitions के लिए books print करते हैं। क्या आपसे 30 second बात कर सकता हूँ?"
 
         await self.session.say(opener)
 
