@@ -3,7 +3,7 @@
 # ═══════════════════════════════════════════════════════
 
 # LiveKit Agent Framework + Plugins
-livekit-agents[sarvam,aws,silero]>=1.4
+livekit-agents[sarvam,aws,silero]==1.4.2
 livekit-api>=0.8.0
 
 # Web Server (server.py)
