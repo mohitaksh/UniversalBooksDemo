@@ -1046,6 +1046,7 @@ async def entrypoint(ctx: JobContext):
         target_language_code="hi-IN",
         model="bulbul:v3",
         speaker="shubh",
+        speech_sample_rate=8000,  # 8kHz WAV for SIP telephony compatibility
     )
 
     # ── Session ──────────────────────────────────────────────────
