@@ -913,6 +913,78 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
+    # ── Console logger (prints everything to stdout) ────────────
+    console_log = logging.getLogger(f"console.{call_id}")
+    console_log.setLevel(logging.DEBUG)
+    if not console_log.handlers:
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        ch.setFormatter(logging.Formatter(
+            "%(asctime)s [CONSOLE] %(message)s", datefmt="%H:%M:%S"
+        ))
+        console_log.addHandler(ch)
+
+    console_log.info("=" * 60)
+    console_log.info(f"📞 NEW CALL | ID: {call_id} | Room: {ctx.room.name}")
+    console_log.info(f"📋 Type: {call_type} | Name: {caller_name} | Phone: {phone_number}")
+    console_log.info(f"🔗 Connected to room: {ctx.room.name} | SID: {ctx.room.sid}")
+    console_log.info(f"👥 Participants already in room: {len(ctx.room.remote_participants)}")
+    for pid, p in ctx.room.remote_participants.items():
+        console_log.info(f"   ├─ {p.identity} (sid={p.sid})")
+        for tid, pub in p.track_publications.items():
+            console_log.info(f"   │  └─ track: {pub.source} kind={pub.kind} subscribed={pub.subscribed}")
+    console_log.info("=" * 60)
+
+    # ── Room event hooks (debug everything LiveKit sends) ────────
+    @ctx.room.on("participant_connected")
+    def _on_participant_connected(participant):
+        console_log.info(f"🟢 PARTICIPANT_CONNECTED | {participant.identity} (sid={participant.sid})")
+
+    @ctx.room.on("participant_disconnected")
+    def _on_participant_disconnected(participant):
+        console_log.info(f"🔴 PARTICIPANT_DISCONNECTED | {participant.identity}")
+
+    @ctx.room.on("track_published")
+    def _on_track_published(publication, participant):
+        console_log.info(
+            f"📡 TRACK_PUBLISHED | by={participant.identity} | "
+            f"source={publication.source} kind={publication.kind} sid={publication.sid}"
+        )
+
+    @ctx.room.on("track_subscribed")
+    def _on_track_subscribed(track, publication, participant):
+        console_log.info(
+            f"✅ TRACK_SUBSCRIBED | by={participant.identity} | "
+            f"source={publication.source} kind={track.kind} sid={track.sid}"
+        )
+
+    @ctx.room.on("track_unsubscribed")
+    def _on_track_unsubscribed(track, publication, participant):
+        console_log.info(
+            f"❌ TRACK_UNSUBSCRIBED | by={participant.identity} | "
+            f"source={publication.source} kind={track.kind}"
+        )
+
+    @ctx.room.on("track_muted")
+    def _on_track_muted(publication, participant):
+        console_log.info(f"🔇 TRACK_MUTED | by={participant.identity} | source={publication.source}")
+
+    @ctx.room.on("track_unmuted")
+    def _on_track_unmuted(publication, participant):
+        console_log.info(f"🔊 TRACK_UNMUTED | by={participant.identity} | source={publication.source}")
+
+    @ctx.room.on("disconnected")
+    def _on_room_disconnected(*args):
+        console_log.info(f"⚡ ROOM_DISCONNECTED | args={args}")
+
+    @ctx.room.on("reconnecting")
+    def _on_reconnecting(*args):
+        console_log.warning(f"🔄 ROOM_RECONNECTING")
+
+    @ctx.room.on("reconnected")
+    def _on_reconnected(*args):
+        console_log.info(f"✅ ROOM_RECONNECTED")
+
     full_log.info("=" * 60)
     full_log.info(f"📞 NEW CALL | ID: {call_id} | Room: {ctx.room.name}")
     full_log.info(f"📋 Type: {call_type} | Name: {caller_name} | Phone: {phone_number}")
@@ -1043,14 +1115,17 @@ async def entrypoint(ctx: JobContext):
             label = "User" if "user" in role.lower() else "Agent"
             transcript_log.info(f"{label}: {text}")
             full_log.info(f"💬 [{label}] {text}")
+            console_log.info(f"💬 [{label}] {text}")
 
     @session.on("user_input_transcribed")
     def on_user_transcribed(ev: UserInputTranscribedEvent):
         """Log interim/final STT results for debugging."""
         if ev.is_final:
             brief_log.info(f"STT_FINAL | {ev.transcript}")
+            console_log.info(f"🎤 STT FINAL: {ev.transcript}")
         else:
             full_log.info(f"🎤 STT interim: {ev.transcript}")
+            console_log.debug(f"🎤 STT interim: {ev.transcript}")
 
     # ── Silence detection ────────────────────────────────────────
     # If user doesn't speak for 10s, auto-transfer to ReEngagerAgent.
