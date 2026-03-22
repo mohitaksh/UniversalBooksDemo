@@ -913,16 +913,17 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-    # ── Console logger (prints everything to stdout) ────────────
-    console_log = logging.getLogger(f"console.{call_id}")
+    # ── Debug logger (writes everything to a log file) ───────────
+    debug_log_path = os.path.join("logs", f"{call_id}_debug.log")
+    console_log = logging.getLogger(f"debug.{call_id}")
     console_log.setLevel(logging.DEBUG)
     if not console_log.handlers:
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        ch.setFormatter(logging.Formatter(
-            "%(asctime)s [CONSOLE] %(message)s", datefmt="%H:%M:%S"
+        fh = logging.FileHandler(debug_log_path, encoding="utf-8")
+        fh.setLevel(logging.DEBUG)
+        fh.setFormatter(logging.Formatter(
+            "%(asctime)s [DEBUG] %(message)s", datefmt="%H:%M:%S"
         ))
-        console_log.addHandler(ch)
+        console_log.addHandler(fh)
 
     console_log.info("=" * 60)
     console_log.info(f"📞 NEW CALL | ID: {call_id} | Room: {ctx.room.name}")
@@ -1031,7 +1032,7 @@ async def entrypoint(ctx: JobContext):
 
     # ── Plugins ──────────────────────────────────────────────────
     llm_plugin = aws.LLM(
-        model="global.anthropic.claude-sonnet-4-6",
+        model="apac.anthropic.claude-sonnet-4-20250514-v1:0",
         region="ap-south-1"
     )
 
