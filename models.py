@@ -1,7 +1,55 @@
 import time
+import random
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+
+# ─────────────────────────────────────────────────────────────────
+# VOICE PROFILES — add new Bulbul v3 voices here
+# ─────────────────────────────────────────────────────────────────
+
+@dataclass
+class VoiceProfile:
+    """A Bulbul v3 voice with gender-matched Hindi verb forms."""
+    name: str           # Display name (used in prompt)
+    tts_speaker: str    # Bulbul v3 speaker ID
+    gender: str         # "male" or "female"
+    # Gender-specific Hindi verb suffixes (hardcoded, no LLM guessing)
+    bol_raha: str       # बोल रहा / बोल रही
+    le_sakta: str       # ले सकता / ले सकती
+    chahta: str         # चाहता / चाहती
+    samajh_gaya: str    # समझ गया / समझ गयी
+    kar_deta: str       # कर देता / कर देती
+    mera: str           # मेरा / मेरी
+
+
+VOICE_PROFILES = [
+    VoiceProfile(
+        name="अमित", tts_speaker="shubh", gender="male",
+        bol_raha="रहा", le_sakta="सकता", chahta="चाहता",
+        samajh_gaya="गया", kar_deta="देता", mera="मेरा",
+    ),
+    VoiceProfile(
+        name="ईशिता", tts_speaker="ishita", gender="female",
+        bol_raha="रही", le_sakta="सकती", chahta="चाहती",
+        samajh_gaya="गयी", kar_deta="देती", mera="मेरा",
+    ),
+    VoiceProfile(
+        name="मनन", tts_speaker="manan", gender="male",
+        bol_raha="रहा", le_sakta="सकता", chahta="चाहता",
+        samajh_gaya="गया", kar_deta="देता", mera="मेरा",
+    ),
+    VoiceProfile(
+        name="श्रेया", tts_speaker="shreya", gender="female",
+        bol_raha="रही", le_sakta="सकती", chahta="चाहती",
+        samajh_gaya="गयी", kar_deta="देती", mera="मेरा",
+    ),
+]
+
+
+def get_random_voice() -> VoiceProfile:
+    """Pick a random voice for this call."""
+    return random.choice(VOICE_PROFILES)
 
 # Prices (adjust if needed, mimicking the Indian Rupee setup)
 USD_TO_INR               = 92.0  # Approx

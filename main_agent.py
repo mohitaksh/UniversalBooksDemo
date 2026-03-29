@@ -38,7 +38,7 @@ from livekit.plugins import sarvam, groq
 
 from prompts import AGENT_PROMPT
 from logger import setup_loggers, write_cost_report
-from models import CostTracker
+from models import CostTracker, VoiceProfile, get_random_voice
 
 load_dotenv(dotenv_path=".env.local")
 
@@ -71,11 +71,21 @@ RunCtx = RunContext[CallUserData]
 class SalesAgent(Agent):
     """Single agent that handles the entire outbound sales call."""
 
-    def __init__(self, caller_name: str = "ji", call_type: str = "name"):
+    def __init__(self, caller_name: str = "ji", call_type: str = "name", voice: VoiceProfile = None):
+        if voice is None:
+            voice = get_random_voice()
+        self.voice = voice
         super().__init__(
             instructions=AGENT_PROMPT.format(
                 caller_name=caller_name,
                 call_type=call_type,
+                agent_name=voice.name,
+                bol_raha=voice.bol_raha,
+                le_sakta=voice.le_sakta,
+                chahta=voice.chahta,
+                samajh_gaya=voice.samajh_gaya,
+                kar_deta=voice.kar_deta,
+                mera=voice.mera,
             ),
             tools=[EndCallTool()],
         )
@@ -247,8 +257,12 @@ async def entrypoint(ctx: JobContext):
         ctx=ctx,
     )
 
+    # ── Pick random voice for this call ──────────────────────────
+    voice = get_random_voice()
+    console_log.info(f"🎤 VOICE | {voice.name} ({voice.tts_speaker}, {voice.gender})")
+
     # ── Single agent ────────────────────────────────────────────
-    agent = SalesAgent(caller_name=caller_name, call_type=call_type)
+    agent = SalesAgent(caller_name=caller_name, call_type=call_type, voice=voice)
 
     # ── Plugins ──────────────────────────────────────────────────
     llm_plugin = groq.LLM(
@@ -264,7 +278,7 @@ async def entrypoint(ctx: JobContext):
     tts_plugin = sarvam.TTS(
         target_language_code="hi-IN",
         model="bulbul:v3",
-        speaker="shubh",
+        speaker=voice.tts_speaker,
         speech_sample_rate=8000,  # 8kHz WAV for SIP telephony compatibility
     )
 
