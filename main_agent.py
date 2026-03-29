@@ -29,8 +29,9 @@ from livekit.agents import (
     AgentSession,
 )
 from livekit.agents.voice import RunContext
+from livekit.agents.beta import EndCallTool
 
-from livekit.plugins import sarvam, openai
+from livekit.plugins import sarvam, groq
 
 from prompts import AGENT_PROMPT
 from logger import setup_loggers, write_cost_report
@@ -72,7 +73,8 @@ class SalesAgent(Agent):
             instructions=AGENT_PROMPT.format(
                 caller_name=caller_name,
                 call_type=call_type,
-            )
+            ),
+            tools=[EndCallTool()],
         )
         self.caller_name = caller_name
         self.call_type = call_type
@@ -246,10 +248,8 @@ async def entrypoint(ctx: JobContext):
     agent = SalesAgent(caller_name=caller_name, call_type=call_type)
 
     # ── Plugins ──────────────────────────────────────────────────
-    llm_plugin = openai.LLM(
-        model="kimi-k2.5",
-        base_url="https://api.moonshot.ai/v1",
-        api_key=os.getenv("MOONSHOT_API_KEY"),
+    llm_plugin = groq.LLM(
+        model="llama-3.3-70b-versatile",
     )
 
     stt_plugin = sarvam.STT(
