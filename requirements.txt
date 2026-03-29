@@ -3,7 +3,7 @@
 # ═══════════════════════════════════════════════════════
 
 # LiveKit Agent Framework + Plugins
-livekit-agents[anthropic,silero]>=1.4
+livekit-agents[openai,silero]>=1.4
 livekit-plugins-sarvam==1.4.2
 livekit-api>=0.8.0
 

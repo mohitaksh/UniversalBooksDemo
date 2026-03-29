@@ -30,7 +30,7 @@ from livekit.agents import (
 )
 from livekit.agents.voice import RunContext
 
-from livekit.plugins import sarvam, anthropic
+from livekit.plugins import sarvam, openai
 
 from prompts import AGENT_PROMPT
 from logger import setup_loggers, write_cost_report
@@ -246,8 +246,10 @@ async def entrypoint(ctx: JobContext):
     agent = SalesAgent(caller_name=caller_name, call_type=call_type)
 
     # ── Plugins ──────────────────────────────────────────────────
-    llm_plugin = anthropic.LLM(
-        model="claude-sonnet-4-20250514",
+    llm_plugin = openai.LLM(
+        model="moonshotai/kimi-k2.5",
+        base_url="https://openrouter.ai/api/v1",
+        api_key=os.getenv("OPENROUTER_API_KEY"),
     )
 
     stt_plugin = sarvam.STT(
