@@ -35,11 +35,6 @@ VOICE_PROFILES = [
         samajh_gaya="गयी", kar_deta="देती", mera="मेरा",
     ),
     VoiceProfile(
-        name="मनन", tts_speaker="manan", gender="male",
-        bol_raha="रहा", le_sakta="सकता", chahta="चाहता",
-        samajh_gaya="गया", kar_deta="देता", mera="मेरा",
-    ),
-    VoiceProfile(
         name="श्रेया", tts_speaker="shreya", gender="female",
         bol_raha="रही", le_sakta="सकती", chahta="चाहती",
         samajh_gaya="गयी", kar_deta="देती", mera="मेरा",
