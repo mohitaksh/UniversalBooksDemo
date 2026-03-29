@@ -27,11 +27,10 @@ from livekit.agents import (
     Agent,
     function_tool,
     AgentSession,
-    inference,
 )
 from livekit.agents.voice import RunContext
 
-from livekit.plugins import sarvam
+from livekit.plugins import sarvam, openai
 
 from prompts import AGENT_PROMPT
 from logger import setup_loggers, write_cost_report
@@ -247,9 +246,10 @@ async def entrypoint(ctx: JobContext):
     agent = SalesAgent(caller_name=caller_name, call_type=call_type)
 
     # ── Plugins ──────────────────────────────────────────────────
-    llm_plugin = inference.LLM(
-        model="moonshotai/kimi-k2.5",
-        provider="baseten",
+    llm_plugin = openai.LLM(
+        model="kimi-k2.5",
+        base_url="https://api.moonshot.ai/v1",
+        api_key=os.getenv("MOONSHOT_API_KEY"),
     )
 
     stt_plugin = sarvam.STT(
