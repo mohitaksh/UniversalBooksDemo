@@ -30,7 +30,7 @@ from livekit.agents import (
 )
 from livekit.agents.voice import RunContext
 
-from livekit.plugins import sarvam, aws
+from livekit.plugins import sarvam, anthropic
 
 from prompts import AGENT_PROMPT
 from logger import setup_loggers, write_cost_report
@@ -246,9 +246,8 @@ async def entrypoint(ctx: JobContext):
     agent = SalesAgent(caller_name=caller_name, call_type=call_type)
 
     # ── Plugins ──────────────────────────────────────────────────
-    llm_plugin = aws.LLM(
-        model="global.anthropic.claude-sonnet-4-6",
-        region="ap-south-1"
+    llm_plugin = anthropic.LLM(
+        model="claude-sonnet-4-20250514",
     )
 
     stt_plugin = sarvam.STT(
