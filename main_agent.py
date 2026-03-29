@@ -368,20 +368,41 @@ async def entrypoint(ctx: JobContext):
     cost_task = asyncio.create_task(periodic_cost_log())
 
     # ── Cleanup ──────────────────────────────────────────────────
-    def shutdown_call(reason="room disconnected"):
+    shutdown_triggered = False
+
+    async def shutdown_call(reason="room disconnected"):
+        nonlocal shutdown_triggered
+        if shutdown_triggered:
+            return  # Prevent double-shutdown
+        shutdown_triggered = True
+
         full_log.info(f"Closing Session | Reason: {reason}")
+        console_log.info(f"🔴 SHUTDOWN | {reason}")
         cost_task.cancel()
         brief_log.info(f"CALL_END | {reason}")
         write_cost_report(tracker=tracker, full_log=full_log, cost_log=cost_log, brief_log=brief_log)
+
+        # Actually close the session and disconnect
+        try:
+            await session.close()
+        except Exception as e:
+            full_log.error(f"Session close error: {e}")
+        try:
+            await ctx.room.disconnect()
+        except Exception as e:
+            full_log.error(f"Room disconnect error: {e}")
+
         full_log.info("Session closed.")
 
     @ctx.room.on("disconnected")
     def on_disconnected(*args):
-        shutdown_call("room disconnected")
+        asyncio.create_task(shutdown_call("room disconnected"))
 
     @ctx.room.on("participant_disconnected")
     def on_participant_disconnected(participant):
-        shutdown_call(f"participant {participant.identity} disconnected")
+        # Only shutdown if the SIP participant (caller) disconnected, not the agent
+        if participant.identity.startswith("sip_"):
+            asyncio.create_task(shutdown_call(f"caller {participant.identity} hung up"))
 
     # ── Start ────────────────────────────────────────────────────
     await session.start(room=ctx.room, agent=agent)
