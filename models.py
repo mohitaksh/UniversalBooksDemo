@@ -24,16 +24,16 @@ class VoiceProfile:
 
 
 VOICE_PROFILES = [
-    VoiceProfile(
-        name="अमित", tts_speaker="shubh", gender="male",
-        bol_raha="रहा", le_sakta="सकता", chahta="चाहता",
-        samajh_gaya="गया", kar_deta="देता", mera="मेरा",
-    ),
-    VoiceProfile(
-        name="ईशिता", tts_speaker="ishita", gender="female",
-        bol_raha="रही", le_sakta="सकती", chahta="चाहती",
-        samajh_gaya="गयी", kar_deta="देती", mera="मेरा",
-    ),
+    # VoiceProfile(
+    #    name="अमित", tts_speaker="shubh", gender="male",
+    #    bol_raha="रहा", le_sakta="सकता", chahta="चाहता",
+    #    samajh_gaya="गया", kar_deta="देता", mera="मेरा",
+    #),
+    ### VoiceProfile(
+    ###    name="ईशिता", tts_speaker="ishita", gender="female",
+    ###   bol_raha="रही", le_sakta="सकती", chahta="चाहती",
+    ###    samajh_gaya="गयी", kar_deta="देती", mera="मेरा",
+    ###),
     VoiceProfile(
         name="श्रेया", tts_speaker="shreya", gender="female",
         bol_raha="रही", le_sakta="सकती", chahta="चाहती",
