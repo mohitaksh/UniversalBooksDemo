@@ -27,6 +27,9 @@ from livekit.agents import (
     Agent,
     function_tool,
     AgentSession,
+    BackgroundAudioPlayer,
+    AudioConfig,
+    BuiltinAudioClip,
 )
 from livekit.agents.voice import RunContext
 from livekit.agents.beta import EndCallTool
@@ -406,6 +409,16 @@ async def entrypoint(ctx: JobContext):
 
     # ── Start ────────────────────────────────────────────────────
     await session.start(room=ctx.room, agent=agent)
+
+    # ── Background Audio (office ambience) ───────────────────────
+    background_audio = BackgroundAudioPlayer(
+        ambient_sound=AudioConfig(BuiltinAudioClip.OFFICE_AMBIENCE, volume=0.4),
+        thinking_sound=[
+            AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING, volume=0.5),
+            AudioConfig(BuiltinAudioClip.KEYBOARD_TYPING2, volume=0.4),
+        ],
+    )
+    await background_audio.start(room=ctx.room, agent_session=session)
 
 
 if __name__ == "__main__":
