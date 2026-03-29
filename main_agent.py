@@ -2,17 +2,16 @@
 main_agent.py
 ─────────────
 Single-agent architecture for Universal Books outbound sales calls (Demo).
-One SalesAgent handles the entire call with all tools directly attached.
-All logging, metrics, and cost tracking are preserved.
+One SalesAgent with 2 tools: tag_lead + schedule_callback.
+All logging, metrics, and cost tracking preserved.
 """
 
 import os
 import json
 import asyncio
 import logging
-import httpx
 from datetime import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -31,7 +30,7 @@ from livekit.agents import (
 )
 from livekit.agents.voice import RunContext
 
-from livekit.plugins import sarvam, openai
+from livekit.plugins import sarvam, aws
 
 from prompts import AGENT_PROMPT
 from logger import setup_loggers, write_cost_report
@@ -56,7 +55,6 @@ class CallUserData:
     tracker: CostTracker = None
     brief_log: logging.Logger = None
     ctx: Optional[JobContext] = None
-    collected_email: str = ""
 
 
 RunCtx = RunContext[CallUserData]
@@ -86,7 +84,12 @@ class SalesAgent(Agent):
                 f"AGENT_ENTER | SalesAgent | {self.call_type}:{self.caller_name}"
             )
 
-        await asyncio.sleep(5.0)  # SIP audio establishment delay
+        # Wait for the SIP participant to be ready
+        try:
+            await self.session.userdata.ctx.wait_for_participant()
+        except Exception:
+            pass  # Fallback: participant might already be connected
+        await asyncio.sleep(2.0)  # Short buffer for audio establishment
 
         # Hardcoded identity check opener
         if self.call_type == "institution":
@@ -101,7 +104,7 @@ class SalesAgent(Agent):
 
     @function_tool
     async def tag_lead(self, context: RunCtx, tag: str, notes: str = "") -> str:
-        """Tag the lead with final outcome. Tags: Interested, Send Sample, Call Back, Not Interested, Wrong Contact. MUST be called before call ends."""
+        """Tag the lead with final outcome. Tags: Interested, Call Back, Not Interested, Wrong Contact. MUST be called before call ends."""
         ud = context.userdata
         if ud.tracker:
             ud.tracker.log_function("tag_lead", {"tag": tag, "notes": notes})
@@ -111,7 +114,7 @@ class SalesAgent(Agent):
 
     @function_tool
     async def schedule_callback(self, context: RunCtx, time_1: str, time_2: str = "", notes: str = "") -> str:
-        """Schedule a callback with 1-2 preferred times."""
+        """Schedule a callback with 1-2 preferred times. Use when caller is interested but busy, or wants team to call back."""
         ud = context.userdata
         if ud.tracker:
             ud.tracker.log_function("schedule_callback", {
@@ -121,114 +124,7 @@ class SalesAgent(Agent):
             ud.brief_log.info(
                 f"FUNCTION | schedule_callback | t1='{time_1}' | t2='{time_2}' | notes='{notes}'"
             )
-
-        webhook_url = os.getenv("N8N_CALLBACK_WEBHOOK_URL", "")
-        if not webhook_url:
-            return "Callback note कर लिया — team follow up करेगी।"
-
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(webhook_url, json={
-                    "action": "schedule_callback",
-                    "phone": ud.phone_number,
-                    "name": ud.caller_name,
-                    "preferred_time_1": time_1,
-                    "preferred_time_2": time_2,
-                    "notes": notes,
-                })
-                if resp.status_code == 200:
-                    return "Callback successfully schedule हो गया।"
-                return f"Callback noted but webhook returned {resp.status_code}"
-        except Exception as e:
-            if ud.brief_log:
-                ud.brief_log.error(f"FUNCTION_ERROR | Callback: {e}")
-            return "Callback note कर लिया — team follow up करेगी।"
-
-    @function_tool
-    async def send_material_whatsapp(self, context: RunCtx) -> str:
-        """Send pamphlet/catalogue over WhatsApp."""
-        ud = context.userdata
-        if ud.tracker:
-            ud.tracker.log_function("send_material_whatsapp", {})
-        if ud.brief_log:
-            ud.brief_log.info("FUNCTION | send_material_whatsapp")
-
-        webhook_url = os.getenv("N8N_WHATSAPP_WEBHOOK_URL", "")
-        if not webhook_url:
-            return "WhatsApp भेजने में problem हुई — webhook URL missing है।"
-
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(webhook_url, json={
-                    "action": "send_pamphlet_whatsapp",
-                    "phone": ud.phone_number,
-                    "name": ud.caller_name,
-                })
-                if resp.status_code == 200:
-                    return "WhatsApp pamphlet successfully भेज दिया गया।"
-                return f"WhatsApp send failed — status {resp.status_code}"
-        except Exception as e:
-            if ud.brief_log:
-                ud.brief_log.error(f"FUNCTION_ERROR | WhatsApp: {e}")
-            return "WhatsApp भेजने में network error हुई।"
-
-    @function_tool
-    async def send_material_sms(self, context: RunCtx) -> str:
-        """Send pamphlet link via SMS."""
-        ud = context.userdata
-        if ud.tracker:
-            ud.tracker.log_function("send_material_sms", {})
-        if ud.brief_log:
-            ud.brief_log.info("FUNCTION | send_material_sms")
-
-        webhook_url = os.getenv("N8N_SMS_WEBHOOK_URL", "")
-        if not webhook_url:
-            return "SMS भेजने में problem हुई — webhook URL missing है।"
-
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(webhook_url, json={
-                    "action": "send_pamphlet_sms",
-                    "phone": ud.phone_number,
-                    "name": ud.caller_name,
-                })
-                if resp.status_code == 200:
-                    return "SMS link successfully भेज दिया गया।"
-                return f"SMS send failed — status {resp.status_code}"
-        except Exception as e:
-            if ud.brief_log:
-                ud.brief_log.error(f"FUNCTION_ERROR | SMS: {e}")
-            return "SMS भेजने में network error हुई।"
-
-    @function_tool
-    async def send_material_email(self, context: RunCtx, email: str) -> str:
-        """Send pamphlet to the caller's email address."""
-        ud = context.userdata
-        ud.collected_email = email
-        if ud.tracker:
-            ud.tracker.log_function("send_material_email", {"email": email})
-        if ud.brief_log:
-            ud.brief_log.info(f"FUNCTION | send_material_email | email='{email}'")
-
-        webhook_url = os.getenv("N8N_EMAIL_WEBHOOK_URL", "")
-        if not webhook_url:
-            return f"Email {email} noted — team will follow up."
-
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(webhook_url, json={
-                    "action": "send_pamphlet_email",
-                    "email": email,
-                    "phone": ud.phone_number,
-                    "name": ud.caller_name,
-                })
-                if resp.status_code == 200:
-                    return f"Email {email} पर pamphlet भेज दिया जाएगा।"
-                return f"Email send failed — status {resp.status_code}"
-        except Exception as e:
-            if ud.brief_log:
-                ud.brief_log.error(f"FUNCTION_ERROR | Email: {e}")
-            return f"Email {email} note कर लिया — team follow up करेगी।"
+        return "Callback successfully schedule हो गया। Team preferred time पर call करेंगे।"
 
 
 # ═════════════════════════════════════════════════════════════════
@@ -350,10 +246,9 @@ async def entrypoint(ctx: JobContext):
     agent = SalesAgent(caller_name=caller_name, call_type=call_type)
 
     # ── Plugins ──────────────────────────────────────────────────
-    llm_plugin = openai.LLM(
-        model="sarvam-105b",
-        base_url="https://api.sarvam.ai/v1",
-        api_key=os.getenv("SARVAM_API_KEY"),
+    llm_plugin = aws.LLM(
+        model="global.anthropic.claude-sonnet-4-6",
+        region="ap-south-1"
     )
 
     stt_plugin = sarvam.STT(
@@ -455,7 +350,6 @@ async def entrypoint(ctx: JobContext):
         if ev.new_state == "away":
             brief_log.info("SILENCE | user_away detected — prompting re-engagement")
             console_log.info("⏳ SILENCE | user_away — re-engaging")
-            # Let the LLM handle it naturally via generate_reply
             session.generate_reply()
 
     # ── Periodic cost log ────────────────────────────────────────

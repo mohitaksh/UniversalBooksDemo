@@ -1,6 +1,6 @@
 import os
 import json
-import asyncio
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -33,15 +33,16 @@ class CallRequest(BaseModel):
 @app.post("/call")
 async def make_outbound_call(req: CallRequest):
     """
-    Endpoint for N8N or other clients to trigger an outbound SIP call via LiveKit.
-    
-    call_type: "name" for direct teacher/tutor calls, "institution" for coaching centers.
+    Endpoint to trigger an outbound SIP call via LiveKit.
+    Each call gets a unique room to prevent duplicate agents.
     """
     sip_trunk_id = os.getenv("SIP_OUTBOUND_TRUNK_ID")
     if not sip_trunk_id:
         raise HTTPException(status_code=500, detail="SIP_OUTBOUND_TRUNK_ID not configured in .env.local")
-        
-    room_name = f"call_{req.phone_number.strip('+')}"
+
+    # Unique room name per call — prevents duplicate agents when calling same number rapidly
+    timestamp = int(time.time())
+    room_name = f"call_{req.phone_number.strip('+')}_{timestamp}"
     
     # LiveKit credentials
     lk_url = os.getenv("LIVEKIT_URL")
@@ -83,12 +84,11 @@ async def make_outbound_call(req: CallRequest):
             })
         )
         try:
-            logger.info(f"Explicitly dispatching UniversalBooksAgent to room {room_name}")
+            logger.info(f"Dispatching UniversalBooksAgent to room {room_name}")
             dispatch_res = await api.agent_dispatch.create_dispatch(dispatch_req)
             logger.info(f"Agent Dispatch Response: {dispatch_res}")
         except Exception as dispatch_err:
-            logger.error(f"Agent Dispatch Failed! Is 'UniversalBooksAgent' registered? Error: {dispatch_err}")
-            # We don't fail the whole request since the SIP connection already started, but we note it.
+            logger.error(f"Agent Dispatch Failed! Error: {dispatch_err}")
         
         return {
             "status": "success", 
