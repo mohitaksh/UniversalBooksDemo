@@ -7,9 +7,13 @@ DISPATCH FLOW:
   2. LiveKit dispatches this agent to the room
   3. This entrypoint reads the metadata
   4. Picks the right call flow entry agent based on call_type
-  5. Starts the AgentSession with that agent + Sarvam TTS/STT + Groq LLM
+  5. Starts the AgentSession with Sarvam TTS/STT + Groq LLM
 
 All call flows are in agents/{flow_name}/agent.py.
+
+USAGE:
+  python main_agent.py dev        # dev mode (auto-reload)
+  python main_agent.py start      # production
 """
 
 import json
@@ -21,16 +25,17 @@ from datetime import datetime
 from livekit.agents import (
     AgentSession,
     Agent,
-    RtcSession,
-    rtc_session,
+    JobContext,
+    WorkerOptions,
+    cli,
     room_io,
 )
 from livekit.agents.voice import BackgroundAudioPlayer, AudioConfig
-from livekit.plugins import silero
+from livekit.plugins import silero, sarvam, groq
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 # Local imports
-from config import GROQ_MODEL
+from config import GROQ_MODEL, SARVAM_API_KEY, GROQ_API_KEY
 from models import (
     CallType,
     CallUserData,
@@ -88,7 +93,6 @@ def get_entry_agent(call_type: CallType):
         return Step1_Greet
 
     else:
-        # Default: new teacher coaching
         from agents.new_teacher.agent import Step1_Greet
         return Step1_Greet
 
@@ -114,15 +118,16 @@ KEYBOARD_TYPING = AudioConfig(
 # ENTRYPOINT
 # ═══════════════════════════════════════════════════════════════
 
-@rtc_session()
-async def entrypoint(session: RtcSession):
+async def entrypoint(ctx: JobContext):
     """Main entrypoint — dispatched by LiveKit when agent joins a room."""
-    logger.info(f"Agent joined room: {session.room.name}")
+    await ctx.connect()
+
+    logger.info(f"Agent joined room: {ctx.room.name}")
 
     # ── Parse room metadata ──────────────────────────────────
     metadata = {}
     try:
-        metadata = json.loads(session.room.metadata or "{}")
+        metadata = json.loads(ctx.room.metadata or "{}")
     except json.JSONDecodeError:
         logger.warning("Failed to parse room metadata")
 
@@ -155,12 +160,30 @@ async def entrypoint(session: RtcSession):
     EntryAgent = get_entry_agent(call_type)
     entry_agent = EntryAgent()
 
+    # ── Configure TTS / STT / LLM ────────────────────────────
+    tts_plugin = sarvam.TTS(
+        api_key=SARVAM_API_KEY,
+        model="bulbul:v3",
+        speaker=voice.tts_speaker,
+    )
+
+    stt_plugin = sarvam.STT(
+        api_key=SARVAM_API_KEY,
+        model="saaras:v3",
+        language="hi-IN",
+    )
+
+    llm_plugin = groq.LLM(
+        api_key=GROQ_API_KEY,
+        model=GROQ_MODEL,
+    )
+
     # ── Configure session ────────────────────────────────────
     agent_session = AgentSession[CallUserData](
         userdata=userdata,
-        stt=f"sarvam/saaras:v3:hi-IN",
-        llm=f"groq/{GROQ_MODEL}",
-        tts=f"sarvam/bulbul:v3:{voice.tts_speaker}",
+        stt=stt_plugin,
+        llm=llm_plugin,
+        tts=tts_plugin,
         vad=silero.VAD.load(),
         turn_handling={
             "turn_detection": MultilingualModel(),
@@ -169,13 +192,8 @@ async def entrypoint(session: RtcSession):
 
     # ── Start the session ────────────────────────────────────
     await agent_session.start(
-        room=session.room,
+        room=ctx.room,
         agent=entry_agent,
-        room_options=room_io.RoomOptions(
-            audio_input=room_io.AudioInputOptions(
-                # noise_cancellation=noise_cancellation.BVC(),
-            ),
-        ),
     )
 
     # ── Background audio ─────────────────────────────────────
@@ -186,7 +204,7 @@ async def entrypoint(session: RtcSession):
     except Exception as e:
         logger.warning(f"Background audio failed: {e}")
 
-    # ── Wait for session to end ──────────────────────────────
+    # ── Log on session close ─────────────────────────────────
     async def on_close():
         costs = tracker.calculate_costs()
         logger.info(
@@ -198,3 +216,11 @@ async def entrypoint(session: RtcSession):
         )
 
     agent_session.on("close", on_close)
+
+
+# ═══════════════════════════════════════════════════════════════
+# CLI — run with: python main_agent.py dev
+# ═══════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))

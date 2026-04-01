@@ -9,7 +9,7 @@ EDIT YOUR SCRIPTS: Modify CLOSING_GOOD_WISHES below.
 import logging
 import httpx
 from livekit.agents import Agent, RunContext, function_tool
-from livekit.agents.beta import EndCallTool
+from livekit.agents.beta.tools.end_call import EndCallTool
 from agents.base_agent import BaseUBAgent
 from models import CallUserData
 from config import N8N_TAG_LEAD_WEBHOOK_URL
