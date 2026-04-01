@@ -1,9 +1,25 @@
-"""NEET & JEE study material script."""
+"""
+NEET & JEE Study Module
+────────────────────────
+EDIT THIS DATA with your actual product details.
+"""
 
-SCRIPT = (
-    "जी, NEET और J double E के लिए हमारे पास Class 11th और 12th की complete module series है। "
-    "हर subject में 8 modules मिलते हैं। "
-    "इसमें complete theory के साथ-साथ, हर chapter में 350 से ज़्यादा MCQs, "
-    "पिछले 10 साल के questions, और NCERT Exemplar भी covered हैं। "
-    "Teachers का सारा research time बच जाता है।"
-)
+DATA = {
+    "title": "NEET & JEE Study Module",
+    "subtitle": "Complete Module Series for Competitive Exams",
+    "target_classes": "Class 11 & 12",
+    "subjects": ["Physics", "Chemistry", "Biology (NEET)", "Mathematics (JEE)"],
+    "features": [
+        "8 modules per subject — 4 for Class 11, 4 for Class 12",
+        "Complete comprehensive theory",
+        "5-10 classroom topic-wise MCQs after each topic",
+        "350+ topic-wise MCQs per chapter",
+        "Past 10 year NEET and JEE questions with year tags",
+        "NCERT Exemplar questions",
+        "Rank Booster questions",
+        "Separate solution module",
+    ],
+    "usp": "All-in-one competitive prep — teachers save massive research time",
+    "best_for": "Coaching centers running 2-year NEET & JEE programs",
+    "extra_notes": "Content updated every year to match latest exam patterns",
+}

@@ -1,21 +1,33 @@
-import os
-import json
+"""
+server.py — FastAPI server that triggers outbound SIP calls.
+═════════════════════════════════════════════════════════════
+
+Receives: POST /call { name, phone_number, call_type }
+Creates a LiveKit room with metadata, dispatches the agent,
+and initiates a SIP outbound call.
+
+The call_type determines which agent flow runs (10 types supported).
+"""
+
 import time
+import logging
+from enum import Enum
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
+import uvicorn
 
-from livekit.api import LiveKitAPI, CreateSIPParticipantRequest
-from livekit.protocol.agent_dispatch import CreateAgentDispatchRequest
-import logging
+from livekit.api import LiveKitAPI, CreateRoomRequest, SIPParticipantInfo
+from livekit.api.sip_service import CreateSIPParticipantRequest
 
-logging.basicConfig(level=logging.INFO)
+from config import LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, SIP_OUTBOUND_TRUNK_ID
+from models import CallType
+
 logger = logging.getLogger("server")
 
-load_dotenv(dotenv_path=".env.local")
-
-app = FastAPI()
+app = FastAPI(title="UniversalBooks Voice AI Server")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,83 +37,99 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ─── Request Model ──────────────────────────────────────────
+
 class CallRequest(BaseModel):
+    """
+    Request body for /call endpoint.
+
+    call_type accepts any of:
+      new_teacher_coaching, new_teacher_tuition,
+      followup_digital_sample_1, followup_digital_sample_2,
+      followup_physical_sample_1, followup_physical_sample_2,
+      followup_visit, contacted_physically, contacted_call, referral
+
+    Legacy values also accepted: "name" → new_teacher_tuition, "institution" → new_teacher_coaching
+    """
+    name: str
     phone_number: str
-    name: str = "Client"
-    call_type: str = "name"  # "name" (direct person) or "institution" (coaching center)
+    call_type: str = "new_teacher_coaching"
+
+
+# ─── Health Check ────────────────────────────────────────────
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "UniversalBooks Voice AI"}
+
+
+# ─── Place Call ──────────────────────────────────────────────
 
 @app.post("/call")
 async def make_outbound_call(req: CallRequest):
     """
-    Endpoint to trigger an outbound SIP call via LiveKit.
-    Each call gets a unique room to prevent duplicate agents.
+    Create a room, dispatch the agent, and initiate a SIP outbound call.
+    The agent reads call_type from room metadata and picks the right flow.
     """
-    sip_trunk_id = os.getenv("SIP_OUTBOUND_TRUNK_ID")
-    if not sip_trunk_id:
-        raise HTTPException(status_code=500, detail="SIP_OUTBOUND_TRUNK_ID not configured in .env.local")
+    if not all([LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, SIP_OUTBOUND_TRUNK_ID]):
+        raise HTTPException(status_code=500, detail="LiveKit not configured")
 
-    # Unique room name per call — prevents duplicate agents when calling same number rapidly
-    timestamp = int(time.time())
-    room_name = f"call_{req.phone_number.strip('+')}_{timestamp}"
-    
-    # LiveKit credentials
-    lk_url = os.getenv("LIVEKIT_URL")
-    lk_api_key = os.getenv("LIVEKIT_API_KEY")
-    lk_api_secret = os.getenv("LIVEKIT_API_SECRET")
-    
-    if not all([lk_url, lk_api_key, lk_api_secret]):
-        raise HTTPException(status_code=500, detail="LiveKit credentials missing in .env.local")
-    
-    api = LiveKitAPI(
-        url=lk_url,
-        api_key=lk_api_key,
-        api_secret=lk_api_secret
-    )
-    
+    phone = req.phone_number.strip()
+    if not phone.startswith("+"):
+        phone = f"+91{phone}"  # Default to India
+
+    ts = int(time.time())
+    room_name = f"call_{phone.replace('+', '')}_{ts}"
+
+    # Room metadata — the agent reads this to pick the right flow
+    import json
+    metadata = json.dumps({
+        "name": req.name,
+        "phone_number": phone,
+        "call_type": req.call_type,
+    })
+
+    logger.info(f"CALL REQUEST | {req.name} | {phone} | type={req.call_type}")
+
     try:
-        # Create SIP Participant request
-        request = CreateSIPParticipantRequest(
-            sip_trunk_id=sip_trunk_id,
-            sip_call_to=req.phone_number,
+        api = LiveKitAPI(
+            url=LIVEKIT_URL,
+            api_key=LIVEKIT_API_KEY,
+            api_secret=LIVEKIT_API_SECRET,
+        )
+
+        # Create room with metadata
+        await api.room.create_room(CreateRoomRequest(
+            name=room_name,
+            empty_timeout=60,
+            metadata=metadata,
+        ))
+
+        # Create SIP participant (the outbound call)
+        await api.sip.create_sip_participant(CreateSIPParticipantRequest(
             room_name=room_name,
-            participant_identity=f"sip_{req.phone_number}",
-            participant_name=req.name
-        )
-        
-        # Initiate the SIP call
-        logger.info(f"Initiating SIP call for {req.phone_number} to room {room_name}")
-        res = await api.sip.create_sip_participant(request)
-        logger.info(f"SIP Participant created: {res.participant_identity}")
-        
-        # Dispatch the agent to the room explicitly
-        dispatch_req = CreateAgentDispatchRequest(
-            agent_name="UniversalBooksAgent",
-            room=room_name,
-            metadata=json.dumps({
-                "name": req.name,
-                "phone": req.phone_number,
-                "call_type": req.call_type
-            })
-        )
-        try:
-            logger.info(f"Dispatching UniversalBooksAgent to room {room_name}")
-            dispatch_res = await api.agent_dispatch.create_dispatch(dispatch_req)
-            logger.info(f"Agent Dispatch Response: {dispatch_res}")
-        except Exception as dispatch_err:
-            logger.error(f"Agent Dispatch Failed! Error: {dispatch_err}")
-        
-        return {
-            "status": "success", 
-            "message": "Outbound call initiated and agent dispatched",
-            "room_name": room_name,
-            "participant_id": res.participant_identity
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to initiate call: {str(e)}")
-    finally:
+            sip_trunk_id=SIP_OUTBOUND_TRUNK_ID,
+            sip_call_to=phone,
+            participant_identity=f"sip_{phone}",
+            participant_name=req.name,
+        ))
+
         await api.aclose()
-        
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
+
+        return {
+            "status": "ok",
+            "room_name": room_name,
+            "phone": phone,
+            "call_type": req.call_type,
+        }
+
+    except Exception as e:
+        logger.error(f"Call failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Run ─────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8080)

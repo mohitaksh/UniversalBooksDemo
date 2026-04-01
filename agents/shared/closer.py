@@ -1,17 +1,18 @@
 """
-closer.py
+closer.py — Shared closing agent used by all call flows.
 ──────────
-CloserAgent — Final agent. Says goodbye, tags the lead, ends the call.
+Says goodbye, tags the lead via N8N, ends the call.
 
-EDIT YOUR SCRIPTS: Modify CLOSING below.
+EDIT YOUR SCRIPTS: Modify CLOSING_GOOD_WISHES below.
 """
 
 import logging
-from livekit.agents import RunContext, function_tool
+import httpx
+from livekit.agents import Agent, RunContext, function_tool
 from livekit.agents.beta import EndCallTool
 from agents.base_agent import BaseUBAgent
 from models import CallUserData
-from tools.tag_lead import tag_lead_tool
+from config import N8N_TAG_LEAD_WEBHOOK_URL
 
 logger = logging.getLogger("agents.closer")
 
@@ -20,8 +21,10 @@ logger = logging.getLogger("agents.closer")
 # SCRIPTS — Edit these
 # ═══════════════════════════════════════════════════════════════
 
-CLOSING = (
-    "बहुत शुक्रिया आपका time देने के लिए। आपका दिन अच्छा रहे, नमस्ते!"
+CLOSING_GOOD_WISHES = (
+    "Thank you for your time sir, our content has empowered 1 Lakh+ institutes "
+    "with better results and admissions and we are always here to keep working "
+    "towards helping you teach better. Have a great day sir!"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -30,10 +33,11 @@ CLOSING = (
 class CloserAgent(BaseUBAgent):
     """
     Final agent — says goodbye, tags lead, and ends call.
+    Used by ALL call flows as the terminal agent.
 
     Args:
-        tag: Lead tag to apply (Interested, Call Back, Not Interested, Wrong Contact)
-        notes: Optional notes for the tag
+        tag: Lead tag (Interested, Call Back, Not Interested, Wrong Contact)
+        notes: Optional notes
     """
 
     def __init__(self, tag: str = "Not Interested", notes: str = "", **kwargs):
@@ -41,20 +45,17 @@ class CloserAgent(BaseUBAgent):
         self._notes = notes
         super().__init__(
             instructions=(
-                "You are closing the call. The goodbye has been said. "
-                "Now call end_call to disconnect."
+                "The goodbye has been said. Call end_call to disconnect."
             ),
             tools=[EndCallTool()],
             **kwargs,
         )
 
     async def on_enter(self) -> None:
-        """Say goodbye, tag the lead, then the LLM calls end_call."""
-        # Say the closing script
-        await self.say_script(CLOSING)
+        # Say goodbye
+        await self.say_script(CLOSING_GOOD_WISHES)
 
-        # Tag the lead via N8N
-        # We call the tool function directly since we already know the tag
+        # Tag the lead (best-effort webhook)
         ud = self.session.userdata
         ud.lead_tag = self._tag
         ud.lead_notes = self._notes
@@ -62,11 +63,8 @@ class CloserAgent(BaseUBAgent):
         if ud.tracker:
             ud.tracker.log_function("tag_lead", {"tag": self._tag, "notes": self._notes})
 
-        logger.info(f"CLOSER | tag={self._tag} | notes={self._notes}")
+        logger.info(f"CLOSER | {ud.caller_name} | tag={self._tag}")
 
-        # Fire N8N webhook (best-effort, reusing the logic from the tool)
-        import httpx
-        from config import N8N_TAG_LEAD_WEBHOOK_URL
         if N8N_TAG_LEAD_WEBHOOK_URL:
             try:
                 async with httpx.AsyncClient(timeout=5) as client:
