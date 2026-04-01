@@ -28,40 +28,38 @@ app.add_middleware(
 class CallRequest(BaseModel):
     phone_number: str
     name: str = "Client"
-    call_type: str = "NEW_TEACHER" 
-    # Valid types expected by N8N: 
-    # NEW_TEACHER
-    # DIGITAL_SAMPLE_FOLLOW_UP_1
-    # DIGITAL_SAMPLE_FOLLOW_UP_2
-    # PHYSICAL_SAMPLE_FOLLOW_UP_1
-    # PHYSICAL_SAMPLE_FOLLOW_UP_2
-    # VISITED_FOLLOW_UP
-    # CONTACTED_BEFORE_PHYSICALLY
-    # CONTACTED_BEFORE_CALL
-    # REFERRED
+    call_type: str = "name"  # "name" (direct person) or "institution" (coaching center)
 
 @app.post("/call")
 async def make_outbound_call(req: CallRequest):
     """
-    Endpoint to trigger an outbound SIP call via LiveKit via N8N Webhook.
+    Endpoint to trigger an outbound SIP call via LiveKit.
+    Each call gets a unique room to prevent duplicate agents.
     """
     sip_trunk_id = os.getenv("SIP_OUTBOUND_TRUNK_ID")
     if not sip_trunk_id:
-        raise HTTPException(status_code=500, detail="SIP_OUTBOUND_TRUNK_ID not configured")
+        raise HTTPException(status_code=500, detail="SIP_OUTBOUND_TRUNK_ID not configured in .env.local")
 
+    # Unique room name per call — prevents duplicate agents when calling same number rapidly
     timestamp = int(time.time())
     room_name = f"call_{req.phone_number.strip('+')}_{timestamp}"
     
+    # LiveKit credentials
     lk_url = os.getenv("LIVEKIT_URL")
     lk_api_key = os.getenv("LIVEKIT_API_KEY")
     lk_api_secret = os.getenv("LIVEKIT_API_SECRET")
     
     if not all([lk_url, lk_api_key, lk_api_secret]):
-        raise HTTPException(status_code=500, detail="LiveKit credentials missing")
+        raise HTTPException(status_code=500, detail="LiveKit credentials missing in .env.local")
     
-    api = LiveKitAPI(url=lk_url, api_key=lk_api_key, api_secret=lk_api_secret)
+    api = LiveKitAPI(
+        url=lk_url,
+        api_key=lk_api_key,
+        api_secret=lk_api_secret
+    )
     
     try:
+        # Create SIP Participant request
         request = CreateSIPParticipantRequest(
             sip_trunk_id=sip_trunk_id,
             sip_call_to=req.phone_number,
@@ -70,12 +68,14 @@ async def make_outbound_call(req: CallRequest):
             participant_name=req.name
         )
         
+        # Initiate the SIP call
         logger.info(f"Initiating SIP call for {req.phone_number} to room {room_name}")
         res = await api.sip.create_sip_participant(request)
         logger.info(f"SIP Participant created: {res.participant_identity}")
         
+        # Dispatch the agent to the room explicitly
         dispatch_req = CreateAgentDispatchRequest(
-            agent_name="UniversalBooksAgent", # The name doesn't really matter if we have 1 Worker accepting all
+            agent_name="UniversalBooksAgent",
             room=room_name,
             metadata=json.dumps({
                 "name": req.name,
@@ -84,17 +84,24 @@ async def make_outbound_call(req: CallRequest):
             })
         )
         try:
-            logger.info(f"Dispatching Agent to room {room_name} with type {req.call_type}")
+            logger.info(f"Dispatching UniversalBooksAgent to room {room_name}")
             dispatch_res = await api.agent_dispatch.create_dispatch(dispatch_req)
+            logger.info(f"Agent Dispatch Response: {dispatch_res}")
         except Exception as dispatch_err:
             logger.error(f"Agent Dispatch Failed! Error: {dispatch_err}")
         
         return {
             "status": "success", 
-            "message": "Outbound call initiated",
-            "room_name": room_name
+            "message": "Outbound call initiated and agent dispatched",
+            "room_name": room_name,
+            "participant_id": res.participant_identity
         }
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to initiate call: {str(e)}")
     finally:
         await api.aclose()
+        
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

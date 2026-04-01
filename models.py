@@ -1,17 +1,57 @@
+"""
+models.py
+─────────
+Shared data models, voice profiles, cost tracking, and call type definitions.
+"""
+
 import time
 import random
+from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-# ─────────────────────────────────────────────────────────────────
-# VOICE PROFILES — add new Bulbul v3 voices here
-# ─────────────────────────────────────────────────────────────────
+
+# ═══════════════════════════════════════════════════════════════
+# CALL TYPES — all supported outbound call categories
+# ═══════════════════════════════════════════════════════════════
+
+class CallType(str, Enum):
+    """Every supported call type. Value is the API string from N8N."""
+    NEW_TEACHER_COACHING       = "new_teacher_coaching"
+    NEW_TEACHER_TUITION        = "new_teacher_tuition"
+    FOLLOWUP_DIGITAL_SAMPLE_1  = "followup_digital_sample_1"
+    FOLLOWUP_DIGITAL_SAMPLE_2  = "followup_digital_sample_2"
+    FOLLOWUP_PHYSICAL_SAMPLE_1 = "followup_physical_sample_1"
+    FOLLOWUP_PHYSICAL_SAMPLE_2 = "followup_physical_sample_2"
+    FOLLOWUP_VISIT             = "followup_visit"
+    CONTACTED_PHYSICALLY       = "contacted_physically"
+    CONTACTED_CALL             = "contacted_call"
+    REFERRAL                   = "referral"
+
+
+def call_type_from_string(s: str) -> CallType:
+    """Resolve a call_type string to enum. Falls back to NEW_TEACHER_COACHING."""
+    s = s.strip().lower()
+    for ct in CallType:
+        if ct.value == s:
+            return ct
+    # Legacy compat: "name" → tuition, "institution" → coaching
+    if s == "name":
+        return CallType.NEW_TEACHER_TUITION
+    if s == "institution":
+        return CallType.NEW_TEACHER_COACHING
+    return CallType.NEW_TEACHER_COACHING
+
+
+# ═══════════════════════════════════════════════════════════════
+# VOICE PROFILES — Bulbul v3 speakers
+# ═══════════════════════════════════════════════════════════════
 
 @dataclass
 class VoiceProfile:
     """A Bulbul v3 voice with gender-matched Hindi verb forms."""
-    name: str           # Display name (used in prompt)
+    name: str           # Display name in Devanagari (used in prompt)
     tts_speaker: str    # Bulbul v3 speaker ID
     gender: str         # "male" or "female"
     # Gender-specific Hindi verb suffixes (hardcoded, no LLM guessing)
@@ -25,15 +65,10 @@ class VoiceProfile:
 
 VOICE_PROFILES = [
     # VoiceProfile(
-    #    name="अमित", tts_speaker="shubh", gender="male",
-    #    bol_raha="रहा", le_sakta="सकता", chahta="चाहता",
-    #    samajh_gaya="गया", kar_deta="देता", mera="मेरा",
-    #),
-    ### VoiceProfile(
-    ###    name="ईशिता", tts_speaker="ishita", gender="female",
-    ###   bol_raha="रही", le_sakta="सकती", chahta="चाहती",
-    ###    samajh_gaya="गयी", kar_deta="देती", mera="मेरा",
-    ###),
+    #     name="अमित", tts_speaker="shubh", gender="male",
+    #     bol_raha="रहा", le_sakta="सकता", chahta="चाहता",
+    #     samajh_gaya="गया", kar_deta="देता", mera="मेरा",
+    # ),
     VoiceProfile(
         name="श्रेया", tts_speaker="shreya", gender="female",
         bol_raha="रही", le_sakta="सकती", chahta="चाहती",
@@ -46,36 +81,62 @@ def get_random_voice() -> VoiceProfile:
     """Pick a random voice for this call."""
     return random.choice(VOICE_PROFILES)
 
-# Prices (adjust if needed, mimicking the Indian Rupee setup)
-USD_TO_INR               = 92.0  # Approx
-PRICE_TTS_PER_10K_CHARS  = 30.0  # INR
-PRICE_STT_PER_MIN        = 0.50  # INR
 
-# Claude Sonnet 4.5 via AWS Bedrock ($3.00 input, $15.00 output per 1M tokens)
-PRICE_LLM_INPUT_PER_1M   = 3.00  # USD
-PRICE_LLM_OUTPUT_PER_1M  = 15.00  # USD
-
-# ─────────────────────────────────────────────────────────────────
-# CALLER INFO
-# ─────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# SHARED CALL STATE — passed via session.userdata
+# ═══════════════════════════════════════════════════════════════
 
 @dataclass
-class PatientInfo:
-    """Carries caller context across agent handoffs."""
-    name:   Optional[str] = None
-    phone:  Optional[str] = None
-    reason: Optional[str] = None
+class CallUserData:
+    """Shared state across all agents in a single call session."""
+    # Caller identity
+    caller_name: str = "ji"
+    phone_number: str = ""
+    call_type: CallType = CallType.NEW_TEACHER_COACHING
 
-    def is_complete(self) -> bool:
-        return all([self.name, self.phone, self.reason])
+    # Voice for this call
+    voice: Optional[VoiceProfile] = None
 
-    def __str__(self):
-        return f"name='{self.name}' phone='{self.phone}' reason='{self.reason}'"
+    # Collected intent data
+    exam_type: Optional[str] = None         # "neet", "jee", "boards", "foundation", etc.
+    class_range: Optional[str] = None       # "11-12", "9-10", "6-8"
+    interest_level: Optional[str] = None    # "high", "medium", "low", "none"
+    callback_time: Optional[str] = None     # "Tomorrow at 5pm"
+    lead_tag: Optional[str] = None          # "Interested", "Not Interested", etc.
+    lead_notes: Optional[str] = None
+
+    # Cost tracking
+    tracker: Optional[Any] = None           # CostTracker instance
+    call_id: str = ""
+
+    # Template variables (populated from voice profile)
+    def voice_vars(self) -> dict:
+        """Returns template variables for prompt formatting."""
+        v = self.voice or get_random_voice()
+        return {
+            "agent_name": v.name,
+            "caller_name": self.caller_name,
+            "call_type": self.call_type.value,
+            "bol_raha": v.bol_raha,
+            "le_sakta": v.le_sakta,
+            "chahta": v.chahta,
+            "samajh_gaya": v.samajh_gaya,
+            "kar_deta": v.kar_deta,
+            "mera": v.mera,
+        }
 
 
-# ─────────────────────────────────────────────────────────────────
-# COST TRACKER
-# ─────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# COST TRACKING
+# ═══════════════════════════════════════════════════════════════
+
+# Prices (adjust if needed)
+USD_TO_INR               = 92.0
+PRICE_TTS_PER_10K_CHARS  = 30.0   # INR
+PRICE_STT_PER_MIN        = 0.50   # INR
+PRICE_LLM_INPUT_PER_1M   = 3.00   # USD (Groq approx)
+PRICE_LLM_OUTPUT_PER_1M  = 15.00  # USD
+
 
 @dataclass
 class CostTracker:
@@ -83,8 +144,7 @@ class CostTracker:
     Tracks all billable usage across the call.
 
     LLM BILLING NOTE:
-    LLMs charge for the FULL context sent each turn
-    (conversation history grows each turn — you pay for it every time).
+    LLMs charge for the FULL context sent each turn.
     We track both:
       - llm_input_tokens_total : sum of full prompt_tokens (actual billing)
       - llm_input_tokens_delta : sum of new tokens only (informational)
@@ -93,24 +153,22 @@ class CostTracker:
     call_id:    str   = ""
     call_start: float = field(default_factory=time.time)
 
-    # TTS (Bulbul v3) — billed per character spoken
+    # TTS (Bulbul v3)
     tts_chars_total:    int   = 0
     tts_active_seconds: float = 0.0
 
-    # STT (Saaras v3) — billed per minute of user speech
+    # STT (Saaras v3)
     stt_active_seconds: float = 0.0
 
-    # LLM — billed per token
-    llm_input_tokens_total:  int = 0   # cumulative (actual billing)
-    llm_input_tokens_delta:  int = 0   # new tokens per turn (informational)
+    # LLM
+    llm_input_tokens_total:  int = 0
+    llm_input_tokens_delta:  int = 0
     llm_output_tokens_total: int = 0
     llm_calls:               int = 0
-    _last_input_tokens:      int = 0   # used to compute delta
+    _last_input_tokens:      int = 0
 
-    # Function call timeline for brief log
+    # Function call timeline
     function_calls: list = field(default_factory=list)
-
-    # ── LLM ────────────────────────────────────────────────────
 
     def log_llm(self, input_tokens: int, output_tokens: int):
         delta = (
@@ -124,16 +182,12 @@ class CostTracker:
         self.llm_calls               += 1
         self._last_input_tokens       = input_tokens
 
-    # ── Function log ────────────────────────────────────────────
-
     def log_function(self, name: str, args: dict):
         self.function_calls.append({
             "time":     datetime.now().strftime("%H:%M:%S"),
             "function": name,
             "args":     args,
         })
-
-    # ── Cost calculation ─────────────────────────────────────────
 
     def calculate_costs(self) -> dict:
         tts_cost = (self.tts_chars_total / 10_000) * PRICE_TTS_PER_10K_CHARS
@@ -142,12 +196,11 @@ class CostTracker:
             (self.llm_input_tokens_total  / 1_000_000) * PRICE_LLM_INPUT_PER_1M +
             (self.llm_output_tokens_total / 1_000_000) * PRICE_LLM_OUTPUT_PER_1M
         ) * USD_TO_INR
-        
-        # Telephony assumed roughly 0.45 per minute based on previous edits
+
         duration = time.time() - self.call_start
-        telephony_cost = (duration / 60) * 0.45 
-        
-        total    = tts_cost + stt_cost + llm_cost + telephony_cost
+        telephony_cost = (duration / 60) * 0.45
+
+        total = tts_cost + stt_cost + llm_cost + telephony_cost
 
         return {
             "duration_seconds":       round(duration, 1),
