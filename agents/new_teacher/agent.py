@@ -16,11 +16,18 @@ Step 8: Good Wishes — Close
 EDIT YOUR SCRIPTS: Modify the constants below each ═══ header.
 Template variables: {agent_name}, {caller_name}, {bol_raha}, {le_sakta},
                     {chahta}, {samajh_gaya}, {kar_deta}, {mera}
+
+LEARNINGS APPLIED (see learnings.md):
+  - @function_tool without parentheses
+  - All tools have ≥1 parameter (for Groq schema compat)
+  - Return Agent instance (not tuple) from function_tool
+  - asyncio.sleep(5.0) in first agent for SIP audio delay
 """
 
+import asyncio
 import logging
-from livekit.agents import RunContext, function_tool
-from agents.base_agent import BaseUBAgent
+from livekit.agents import function_tool
+from agents.base_agent import BaseUBAgent, RunCtx
 from models import CallUserData
 from knowledgebase import kb_to_prompt
 
@@ -168,26 +175,29 @@ class Step1_Greet(BaseUBAgent):
         )
 
     async def on_enter(self) -> None:
+        # SIP audio establishment delay — 5 seconds (from working code)
+        await asyncio.sleep(5.0)
         await self.say_script(S1_GREETING)
 
-    @function_tool()
-    async def identity_confirmed(self, context: RunContext[CallUserData]):
-        """Person confirmed they are the right contact."""
-        return Step2_Intro(chat_ctx=self.chat_ctx), "Identity confirmed"
+    @function_tool
+    async def identity_confirmed(self, context: RunCtx, response: str = "confirmed") -> "Step2_Intro":
+        """Person confirmed they are the right contact. response is what they said."""
+        logger.info(f"Step1 → Step2 | {response}")
+        return Step2_Intro()
 
-    @function_tool()
-    async def wrong_person(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def wrong_person(self, context: RunCtx, response: str = "wrong") -> "BaseUBAgent":
         """Wrong person on the line."""
         await self.say_script(S1_WRONG_PERSON)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Wrong Contact", chat_ctx=self.chat_ctx), "Wrong person"
+        return CloserAgent(tag="Wrong Contact")
 
-    @function_tool()
-    async def person_busy(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> "BaseUBAgent":
         """Person is busy right now."""
         await self.say_script(S_BUSY)
         from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent(chat_ctx=self.chat_ctx), "Person busy"
+        return SchedulerAgent()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -213,24 +223,24 @@ class Step2_Intro(BaseUBAgent):
     async def on_enter(self) -> None:
         await self.say_script(S2_INTRO)
 
-    @function_tool()
-    async def permission_granted(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def permission_granted(self, context: RunCtx, response: str = "yes") -> "Step3_AskClasses":
         """Person gave permission to continue."""
-        return Step3_AskClasses(chat_ctx=self.chat_ctx), "Permission granted"
+        return Step3_AskClasses()
 
-    @function_tool()
-    async def not_interested(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "no") -> "BaseUBAgent":
         """Person is not interested."""
         await self.say_script(S_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Not Interested", chat_ctx=self.chat_ctx), "Not interested"
+        return CloserAgent(tag="Not Interested")
 
-    @function_tool()
-    async def person_busy(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> "BaseUBAgent":
         """Person is busy right now."""
         await self.say_script(S_BUSY)
         from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent(chat_ctx=self.chat_ctx), "Person busy"
+        return SchedulerAgent()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -255,12 +265,12 @@ class Step3_AskClasses(BaseUBAgent):
     async def on_enter(self) -> None:
         await self.say_script(S3_ASK_CLASSES)
 
-    @function_tool()
+    @function_tool
     async def classes_shared(
         self,
-        context: RunContext[CallUserData],
+        context: RunCtx,
         classes_and_exams: str,
-    ):
+    ) -> "Step4_ShareProduct":
         """Teacher shared their classes/exams (e.g. 'NEET and JEE', 'Class 9-12', 'Boards')."""
         ud = context.userdata
         ud.exam_type = classes_and_exams
@@ -269,10 +279,7 @@ class Step3_AskClasses(BaseUBAgent):
             ud.tracker.log_function("set_exam_type", {"exam": classes_and_exams})
 
         kb_modules = resolve_kb_modules(classes_and_exams)
-        return Step4_ShareProduct(
-            kb_modules=kb_modules,
-            chat_ctx=self.chat_ctx,
-        ), f"Sharing product info for: {classes_and_exams}"
+        return Step4_ShareProduct(kb_modules=kb_modules)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -309,26 +316,26 @@ class Step4_ShareProduct(BaseUBAgent):
 
     async def on_enter(self) -> None:
         # Let the AI generate a natural product summary from KB data
-        await self.session.generate_reply()
+        self.session.generate_reply()
 
-    @function_tool()
-    async def offer_sample(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def offer_sample(self, context: RunCtx, interest: str = "yes") -> "Step6_OfferSample":
         """Person wants to see samples or learn more. Offer sample link."""
-        return Step6_OfferSample(chat_ctx=self.chat_ctx), "Offering sample"
+        return Step6_OfferSample()
 
-    @function_tool()
-    async def handle_hesitation(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def handle_hesitation(self, context: RunCtx, concern: str = "unsure") -> "BaseUBAgent":
         """Person is hesitant (dekhte hai, batata hu, abhi decide nahi kiya)."""
         await self.say_script(S_HESITANT)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "Hesitant, closing warmly"
+        return CloserAgent(tag="Call Back")
 
-    @function_tool()
-    async def not_interested(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def not_interested(self, context: RunCtx, reason: str = "not interested") -> "BaseUBAgent":
         """Person is not interested."""
         await self.say_script(S_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Not Interested", chat_ctx=self.chat_ctx), "Not interested"
+        return CloserAgent(tag="Not Interested")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -354,22 +361,22 @@ class Step6_OfferSample(BaseUBAgent):
     async def on_enter(self) -> None:
         await self.say_script(S6_OFFER_SAMPLE)
 
-    @function_tool()
-    async def setup_senior_call(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def setup_senior_call(self, context: RunCtx, response: str = "yes") -> "BaseUBAgent":
         """Person wants a senior call. Set it up."""
         from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent(chat_ctx=self.chat_ctx), "Setting up senior call"
+        return SchedulerAgent()
 
-    @function_tool()
-    async def handle_hesitation(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def handle_hesitation(self, context: RunCtx, concern: str = "unsure") -> "BaseUBAgent":
         """Person is unsure."""
         await self.say_script(S_HESITANT)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "Hesitant"
+        return CloserAgent(tag="Call Back")
 
-    @function_tool()
-    async def not_interested(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def not_interested(self, context: RunCtx, reason: str = "not interested") -> "BaseUBAgent":
         """Person is not interested."""
         await self.say_script(S_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Not Interested", chat_ctx=self.chat_ctx), "Not interested"
+        return CloserAgent(tag="Not Interested")

@@ -1,4 +1,4 @@
-"""
+﻿"""
 REFERRAL — Teacher referred by someone
 ═══════════════════════════════════════
 
@@ -7,8 +7,8 @@ TEMPLATE — Fill in your scripts below.
 EDIT YOUR SCRIPTS below.
 """
 
-from livekit.agents import RunContext, function_tool
-from agents.base_agent import BaseUBAgent
+from livekit.agents import function_tool
+from agents.base_agent import BaseUBAgent, RunCtx
 from models import CallUserData
 
 
@@ -47,19 +47,19 @@ class Step1_Greet(BaseUBAgent):
     async def on_enter(self) -> None:
         await self.say_script(S1_GREETING)
 
-    @function_tool()
-    async def identity_confirmed(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def identity_confirmed(self, context: RunCtx, response: str = "ok"):
         """Confirmed."""
         return Step2_Referral(chat_ctx=self.chat_ctx), "Confirmed"
 
-    @function_tool()
-    async def wrong_person(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def wrong_person(self, context: RunCtx, response: str = "ok"):
         """Wrong."""
         from agents.shared.closer import CloserAgent
         return CloserAgent(tag="Wrong Contact", chat_ctx=self.chat_ctx), "Wrong"
 
-    @function_tool()
-    async def person_busy(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "ok"):
         """Busy."""
         from agents.shared.scheduler import SchedulerAgent
         return SchedulerAgent(chat_ctx=self.chat_ctx), "Busy"
@@ -80,14 +80,14 @@ class Step2_Referral(BaseUBAgent):
     async def on_enter(self) -> None:
         await self.say_script(S2_REFERRAL)
 
-    @function_tool()
-    async def permission_granted(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def permission_granted(self, context: RunCtx, response: str = "ok"):
         """Permission to continue — hand off to new teacher flow for pitch."""
         from agents.new_teacher.agent import Step3_AskClasses
         return Step3_AskClasses(chat_ctx=self.chat_ctx), "Referral → pitch"
 
-    @function_tool()
-    async def not_interested(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "ok"):
         """Not interested."""
         await self.say_script(S_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent

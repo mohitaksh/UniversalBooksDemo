@@ -1,4 +1,4 @@
-"""
+﻿"""
 DIGITAL SAMPLE FOLLOW-UP — Teacher who received digital sample
 ═══════════════════════════════════════════════════════════════
 
@@ -15,8 +15,8 @@ EDIT YOUR SCRIPTS: Modify the constants below each ═══ header.
 """
 
 import logging
-from livekit.agents import RunContext, function_tool
-from agents.base_agent import BaseUBAgent
+from livekit.agents import function_tool
+from agents.base_agent import BaseUBAgent, RunCtx
 from models import CallUserData
 
 logger = logging.getLogger("flow.digital_sample")
@@ -106,19 +106,19 @@ class Step1_Greet(BaseUBAgent):
     async def on_enter(self) -> None:
         await self.say_script(S1_GREETING)
 
-    @function_tool()
-    async def identity_confirmed(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def identity_confirmed(self, context: RunCtx, response: str = "ok"):
         """Person confirmed identity."""
         return Step2_Recall(chat_ctx=self.chat_ctx), "Confirmed"
 
-    @function_tool()
-    async def wrong_person(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def wrong_person(self, context: RunCtx, response: str = "ok"):
         """Wrong person."""
         from agents.shared.closer import CloserAgent
         return CloserAgent(tag="Wrong Contact", chat_ctx=self.chat_ctx), "Wrong person"
 
-    @function_tool()
-    async def person_busy(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "ok"):
         """Person is busy."""
         from agents.shared.scheduler import SchedulerAgent
         return SchedulerAgent(chat_ctx=self.chat_ctx), "Busy"
@@ -143,14 +143,14 @@ class Step2_Recall(BaseUBAgent):
         await self.say_script(S2_RECALL)
         await self.say_script(S3_FOLLOWUP)
 
-    @function_tool()
-    async def sample_seen(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def sample_seen(self, context: RunCtx, response: str = "ok"):
         """Person has seen the digital sample and is sharing feedback."""
         await self.say_script(S4_FEEDBACK_ACK)
         return Step5_NextSteps(chat_ctx=self.chat_ctx), "Feedback received"
 
-    @function_tool()
-    async def sample_not_seen(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def sample_not_seen(self, context: RunCtx, response: str = "ok"):
         """Person has NOT seen the files yet."""
         await self.say_script(S4_NOT_SEEN)
         from agents.shared.closer import CloserAgent
@@ -173,22 +173,22 @@ class Step5_NextSteps(BaseUBAgent):
             **kwargs,
         )
 
-    @function_tool()
-    async def interested(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def interested(self, context: RunCtx, response: str = "ok"):
         """Person wants more details, pricing, order, or visit."""
         await self.say_script(S5_INTERESTED)
         from agents.shared.scheduler import SchedulerAgent
         return SchedulerAgent(chat_ctx=self.chat_ctx), "Interested"
 
-    @function_tool()
-    async def hesitant(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def hesitant(self, context: RunCtx, response: str = "ok"):
         """Person is hesitant."""
         await self.say_script(S5_HESITANT)
         from agents.shared.closer import CloserAgent
         return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "Hesitant"
 
-    @function_tool()
-    async def not_interested(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "ok"):
         """Person is not interested."""
         await self.say_script(S5_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent

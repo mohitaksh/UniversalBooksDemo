@@ -109,6 +109,9 @@ class CallUserData:
     tracker: Optional[Any] = None           # CostTracker instance
     call_id: str = ""
 
+    # JobContext reference (for wait_for_participant)
+    ctx: Optional[Any] = None
+
     # Template variables (populated from voice profile)
     def voice_vars(self) -> dict:
         """Returns template variables for prompt formatting."""

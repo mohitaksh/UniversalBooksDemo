@@ -5,12 +5,17 @@ Creates a task for the senior team to call back.
 Fires N8N webhook with the details.
 
 EDIT YOUR SCRIPTS: Modify SETUP_CALL and CONFIRM below.
+
+LEARNINGS APPLIED (see learnings.md):
+  - @function_tool without parentheses
+  - All tools have ≥1 parameter
+  - Return Agent instance (not tuple)
 """
 
 import logging
 import httpx
-from livekit.agents import RunContext, function_tool
-from agents.base_agent import BaseUBAgent
+from livekit.agents import function_tool
+from agents.base_agent import BaseUBAgent, RunCtx
 from models import CallUserData
 from config import N8N_CALLBACK_WEBHOOK_URL
 
@@ -58,12 +63,12 @@ class SchedulerAgent(BaseUBAgent):
     async def on_enter(self) -> None:
         await self.say_script(SETUP_CALL)
 
-    @function_tool()
+    @function_tool
     async def set_callback_time(
         self,
-        context: RunContext[CallUserData],
+        context: RunCtx,
         callback_time: str,
-    ):
+    ) -> "BaseUBAgent":
         """Person gave a specific callback time (e.g. 'tomorrow 5pm', 'Monday morning')."""
         ud = context.userdata
         ud.callback_time = callback_time
@@ -79,10 +84,10 @@ class SchedulerAgent(BaseUBAgent):
         await self.say_script(CONFIRM_SCHEDULED.format(callback_time=callback_time))
 
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "Callback scheduled"
+        return CloserAgent(tag="Call Back")
 
-    @function_tool()
-    async def confirm_default_time(self, context: RunContext[CallUserData]):
+    @function_tool
+    async def confirm_default_time(self, context: RunCtx, response: str = "anytime") -> "BaseUBAgent":
         """Person is fine with default '1 hour' callback window."""
         ud = context.userdata
         ud.callback_time = "within 1 hour"
@@ -96,7 +101,7 @@ class SchedulerAgent(BaseUBAgent):
         await self.say_script(CONFIRM_DEFAULT)
 
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "Default callback scheduled"
+        return CloserAgent(tag="Call Back")
 
     async def _fire_webhook(self, ud: CallUserData, callback_time: str):
         if N8N_CALLBACK_WEBHOOK_URL:
