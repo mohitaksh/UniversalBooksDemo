@@ -114,23 +114,33 @@ def get_entry_agent(call_type: CallType):
 async def entrypoint(ctx: JobContext):
     """Main entrypoint — dispatched by LiveKit when agent joins a room."""
 
-    # ── Read metadata from ctx.job.metadata (NOT ctx.room.metadata) ──
+    # ── Read metadata ────────────────────────────────────────
+    # Server puts metadata on the ROOM (CreateRoomRequest.metadata),
+    # so we read ctx.room.metadata.  ctx.job.metadata is only populated
+    # when using explicit AgentDispatch — try it first as a fallback.
     caller_name = "sir"
     phone_number = ""
     call_type_str = "new_teacher_coaching"
+
+    # Connect first so ctx.room.metadata is available
+    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+
     try:
-        meta = json.loads(ctx.job.metadata or "{}")
+        # Try job metadata first (explicit dispatch)
+        raw = ctx.job.metadata or ""
+        meta = json.loads(raw) if raw.strip() else {}
+        if not meta:
+            # Fallback to room metadata (where server.py puts it)
+            raw = ctx.room.metadata or ""
+            meta = json.loads(raw) if raw.strip() else {}
         caller_name = meta.get("name", "sir") or "sir"
         call_type_str = meta.get("call_type", "new_teacher_coaching") or "new_teacher_coaching"
         phone_number = meta.get("phone_number", meta.get("phone", "")) or ""
-    except Exception:
-        pass
+    except Exception as e:
+        logging.getLogger("entrypoint").warning(f"Metadata parse error: {e}")
 
     call_type = call_type_from_string(call_type_str)
     voice = get_random_voice()
-
-    # ── Connect to room (audio only) ──
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
     # ── Build shared call state ──────────────────────────────
     call_id = f"{phone_number}_{int(time.time())}"
