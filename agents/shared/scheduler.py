@@ -52,9 +52,19 @@ class SchedulerAgent(BaseUBAgent):
     def __init__(self, **kwargs):
         super().__init__(
             instructions=(
-                "You need to schedule a call with the senior team. "
-                "If the person gives a specific time, call set_callback_time with that time. "
-                "If they say 'anytime' or 'within 1 hour is fine', call confirm_default_time. "
+                "You need to schedule a callback with the senior team. "
+                "Listen carefully to what the person says.\n\n"
+                "ROUTING RULES:\n"
+                "1. If they give a specific time (e.g. 'kal 5 baje', 'Monday morning'), "
+                "call set_callback_time.\n"
+                "2. If they say 'anytime' or 'within 1 hour is fine' or 'koi bhi time', "
+                "call confirm_default_time.\n"
+                "3. If they CORRECT themselves or say they want to continue talking about "
+                "products/classes (e.g. 'nahi maine kaha boards ki padhai hoti hai', "
+                "'hum interested hain', 'meri baat suno', 'boards', 'NEET', mention "
+                "any class/exam name), call misrouted_correction.\n"
+                "4. If they say they are NOT interested (nahi chahiye, interest nahi, "
+                "rakhiye, bye), call not_interested.\n\n"
                 "Do NOT generate any speech yourself."
             ),
             **kwargs,
@@ -102,6 +112,21 @@ class SchedulerAgent(BaseUBAgent):
 
         from agents.shared.closer import CloserAgent
         return CloserAgent(tag="Call Back")
+
+    @function_tool
+    async def misrouted_correction(self, context: RunCtx, what_they_said: str = "correction") -> "BaseUBAgent":
+        """Person corrected themselves — they actually want to talk about classes/products, not schedule a callback."""
+        logger.info(f"SCHEDULER | Misrouted correction: {what_they_said} — routing back to Step3")
+        await self.say_script("जी बिल्कुल, कोई बात नहीं!")
+        from agents.new_teacher.agent import Step3_AskClasses
+        return Step3_AskClasses()
+
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "no") -> "BaseUBAgent":
+        """Person is not interested at all."""
+        logger.info(f"SCHEDULER | Not interested: {response}")
+        from agents.shared.closer import CloserAgent
+        return CloserAgent(tag="Not Interested")
 
     async def _fire_webhook(self, ud: CallUserData, callback_time: str):
         if N8N_CALLBACK_WEBHOOK_URL:

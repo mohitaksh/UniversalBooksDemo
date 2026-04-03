@@ -95,11 +95,11 @@ S1_WRONG_PERSON = (
 
 S2_INTRO = (
     "जी {mera} naam {agent_name} है, मै  Universal Books से बोल {bol_raha} हूँ।"
-    "हमारी .. Errorless के नाम se books आती हैं मार्केट मे, आपने शायद सुना होगा, जैसे जो नीट और जे-ई-ई exams के लिए बोहत famous हैं! Errorless Physics वघेरा  .. जानते हैं आप?"
+    "हमारी .. Errorless के नाम se books आती हैं मार्केट मे, आपने शायद सुना होगा, जैसे जो competitive exams के लिए बोहत famous हैं! जैसे Errorless Self Scorer वघेरा  .. जानते हैं आप?"
 )
 
 S2_ASK_PERMISSION = (
-    "जी हा, हम उन्ही बुक्स के पब्लिशर हैं ... और अब हम class sixth se twelfth tak ke liye CBSE boards ki books और Neet, जे ई ई और बाकी medical और engineering exams के लिए, Exam Preparation material बनाते हैं ... जिसपे हम आपकी coaching कि खुद कि branding लगा के देते हैं, बिना किसी extra charges के। और best बात यह है कि हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं .. और .. इसी वजह से हम directly सीधे आप लोगों से ही बात करना चाहते हैं ... तो क्या आप हमसे बस दो मिनट बात कर सकते हैं?"
+    "जी हा, हम उन्ही बुक्स के पब्लिशर हैं ... और अब हम class sixth se twelfth tak ke liye CBSE, जे ई ई और Neet के लिए, Exam Preparation material बनाते हैं ... content हर साल updated रहता है और material पर हम आपकी coaching कि खुद कि branding लगा के देते हैं, बिना किसी extra charges के। और best बात यह है कि हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं .. और .. इसी वजह से हम directly सीधे आप लोगों से ही बात करना चाहते हैं ... तो क्या आप हमसे बस दो मिनट बात कर सकते हैं?"
 )
 
 S2_INTRO_MORE_THEN_ASK_PERMISSION = (
@@ -142,7 +142,7 @@ S6_OFFER_SAMPLE = (
 # ═══════════════════════════════════════════════════════════════
 
 S_HESITANT = (
-    """कोई issue कि बात नहीं है , हम आपको Samples WhatsApp par bhej देते हैं,आप आराम से content check kar lijiye,
+    """कोई issue कि बात नहीं है , हम आपको Samples WhatsApp par bhej देते हैं, आप आराम से content check kar lijiye,
     हम आपको physical book भी arrange कर देंगे। हमारी team आपको call कर के और भी details share कर देगी।
     और बाद मे अगर ऑर्डर भी करना हो तोह हमारी मिनमम क्वानटिटी सिर्फ दस sets हैं। तो आप सिर्फ एक module मंगा के भी देख सकते हैं कि content कितना अच्छा है।
     """
@@ -451,12 +451,23 @@ class Step3_AskClasses(BaseUBAgent):
         super().__init__(
             instructions=(
                 "You asked the teacher what classes and exams they teach. "
-                "Listen for their answer. When they tell you "
-                "(e.g. 'NEET', '9th to 12th', 'JEE and Boards'), "
-                "call classes_shared with the info.\n"
-                "- If busy (busy, baad me, class chal rahi), call person_busy.\n"
-                "- If they ask 'where did you get my number' or 'are you AI', "
-                "call handle_objection.\n"
+                "Listen carefully for their answer.\n\n"
+                "ROUTING RULES (follow strictly):\n"
+                "1. If they mention SPECIFIC classes or exams (e.g. 'NEET', '9th to 12th', "
+                "'JEE and Boards', 'medical', 'engineering', '10th', 'boards'), "
+                "call classes_shared with exactly what they said.\n"
+                "2. If their answer is VAGUE or UNCLEAR (e.g. 'bahut padhai hoti hai', "
+                "'sab hota hai', 'coaching hai', general statements without specific "
+                "class numbers or exam names), call unclear_response.\n"
+                "3. If they say they are busy (busy, baad me, class chal rahi), "
+                "call person_busy.\n"
+                "4. If they say they are NOT interested (nahi chahiye, interest nahi, "
+                "mat bolo), call not_interested.\n"
+                "5. If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n\n"
+                "IMPORTANT: A vague answer is NOT the same as 'busy'. "
+                "Do NOT call person_busy unless they EXPLICITLY say they are busy or "
+                "ask you to call later.\n"
                 "Do NOT speak — only call tools."
             ),
             **kwargs,
@@ -493,8 +504,25 @@ class Step3_AskClasses(BaseUBAgent):
         return Step4_ShareProduct(kb_modules=kb_modules)
 
     @function_tool
+    async def unclear_response(self, context: RunCtx, what_they_said: str = "unclear") -> "Step3_AskClasses":
+        """The teacher gave a vague/unclear answer that doesn't mention specific classes or exams. Ask again for clarification."""
+        logger.info(f"Step3 | Unclear response: {what_they_said} — re-asking")
+        await self.say_script(
+            "जी सर, मतलब specifically कौन सी classes चलती हैं आपके यहाँ? "
+            "जैसे Class 9, 10, 11, 12 .. या NEET, JEE जैसे exams?"
+        )
+        return Step3_AskClasses()
+
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "no") -> "BaseUBAgent":
+        """Person is not interested."""
+        await self.say_script(S_NOT_INTERESTED)
+        from agents.shared.closer import CloserAgent
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
     async def person_busy(self, context: RunCtx, response: str = "busy") -> "BaseUBAgent":
-        """Person is busy right now."""
+        """Person EXPLICITLY said they are busy right now (e.g. 'abhi busy hun', 'baad me baat karo')."""
         await self.say_script(S_BUSY)
         from agents.shared.scheduler import SchedulerAgent
         return SchedulerAgent()
