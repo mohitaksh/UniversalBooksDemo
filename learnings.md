@@ -53,13 +53,21 @@ await background_audio.start(room=ctx.room, agent_session=session)
 tts_plugin = sarvam.TTS(
     target_language_code="hi-IN",
     model="bulbul:v3",
-    speaker="shubh",
+    speaker="shreya",
+    pace=1.65,               # 1.0 = default, 1.65 = natural fast pace
+    enable_preprocessing=False,  # bulbul:v3 ignores this anyway
 )
 ```
 
 ### ❌ Do NOT use
 - `speech_sample_rate=8000` — not needed, let Sarvam handle it.
 - `api_key=` param — reads from env automatically via `SARVAM_API_KEY`.
+
+### TTS Speed (pace parameter)
+- `pace` valid range: `0.5` to `2.0` (float)
+- `1.0` = default speed (too slow for natural phone sales)
+- `1.65` = recommended for natural-sounding sales call pacing
+- Higher values make the agent sound rushed; lower values sound robotic
 
 ---
 
@@ -93,7 +101,7 @@ async def on_enter(self) -> None:
 
 ---
 
-## 5. Function Tools — Groq Schema Compatibility
+## 5. Function Tools — Schema Compatibility
 
 ### ✅ Correct — `@function_tool` WITHOUT parentheses, every tool must have ≥1 parameter
 ```python
@@ -115,19 +123,14 @@ async def tag_lead(self, context: RunCtx, tag: str, notes: str = "") -> str:
 ### ✅ Correct — return the Agent instance from a function_tool
 ```python
 @function_tool
-async def transfer_to_intro(self, context: RunCtx) -> Agent:
+async def transfer_to_intro(self, context: RunCtx, response: str = "ok") -> "Step2_Intro":
     """Transfer to introduction."""
-    return await self._transfer_to("intro", context)
-```
-
-Or use `session.update_agent()` for programmatic (non-LLM) transfers:
-```python
-self.session.update_agent(self.session.userdata.personas["identity_confirmer"])
+    return Step2_Intro()
 ```
 
 ### ❌ Do NOT use
 - Returning `(agent, message)` tuples — that's a different SDK version pattern.
-- Lazy imports inside function_tool — pre-instantiate all agents in entrypoint.
+- Passing `chat_ctx=self.chat_ctx` manually — v1.4.5 handles context transfer automatically.
 
 ---
 
@@ -136,20 +139,21 @@ self.session.update_agent(self.session.userdata.personas["identity_confirmer"])
 ### ✅ Correct
 ```python
 async def entrypoint(ctx: JobContext):
-    meta = json.loads(ctx.job.metadata or "{}")  # NOT ctx.room.metadata
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    # ... setup ...
-    await session.start(room=ctx.room, agent=entry_agent)
+    # Try job metadata first, fallback to room metadata
+    raw = ctx.job.metadata or ""
+    meta = json.loads(raw) if raw.strip() else {}
+    if not meta:
+        raw = ctx.room.metadata or ""
+        meta = json.loads(raw) if raw.strip() else {}
 
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
 ```
 
 ### ❌ Do NOT use
-- `ctx.room.metadata` — metadata comes from `ctx.job.metadata` (dispatch metadata).
+- `ctx.room.metadata` alone — metadata may come from either `ctx.job.metadata` or `ctx.room.metadata` depending on dispatch mode.
 - `rtc_session` decorator — doesn't exist in v1.4.5.
-- `agent_name="UniversalBooksAgent"` in WorkerOptions — only if LiveKit Cloud dispatch is configured for that name. Default empty string works with auto-dispatch.
-- `room_io.RoomOptions` — not needed.
 
 ---
 
@@ -160,7 +164,7 @@ LIVEKIT_URL=wss://...livekit.cloud
 LIVEKIT_API_KEY=...
 LIVEKIT_API_SECRET=...
 SIP_OUTBOUND_TRUNK_ID=...
-GROQ_API_KEY=...
+OPENAI_API_KEY=...
 SARVAM_API_KEY=...
 ```
 
@@ -171,27 +175,101 @@ SARVAM_API_KEY=...
 
 ## 9. LLM Choice
 
-- **Working demo used:** `aws.LLM(model="global.anthropic.claude-sonnet-4-6", region="ap-south-1")`
-- **Groq works but:** has strict JSON schema validation for tools. Every tool needs ≥1 parameter.
-- **If Groq errors on tool schemas**, the LLM will retry infinitely and the agent goes silent.
+- **Current production:** `openai.LLM(model="gpt-4.1-mini")` — fast, cheap, follows instructions well.
+- **Previous:** Groq `llama-3.3-70b-versatile` — has strict JSON schema validation for tools.
+- **If LLM errors on tool schemas**, the LLM will retry infinitely and the agent goes silent.
 
 ---
 
-## 10. Pre-instantiate All Agents
+## 10. Call Termination (SIP Disconnect)
 
-The working code creates ALL agents in `entrypoint()` and stores them in a `personas` dict:
-
+### ✅ Correct — use `session.shutdown()` in CloserAgent
 ```python
-agents = {
-    "greeter": GreeterAgent(...),
-    "identity_confirmer": IdentityConfirmerAgent(...),
-    # ... all agents pre-created ...
-}
-userdata.personas = agents
+# In CloserAgent.on_enter():
+await self.say_script(CLOSING_GOOD_WISHES)
+await asyncio.sleep(2.0)  # Let TTS drain
+self.session.shutdown()    # Gracefully ends session → triggers cleanup
 ```
 
-Handoffs then reference `userdata.personas["agent_name"]` — no lazy imports, no class instantiation inside function_tools.
+### ❌ Do NOT use
+- `ctx.room.disconnect()` — this is an async method, calling it synchronously or from wrong context fails silently.
+- Manual `room.disconnect()` without `session.shutdown()` — leaves the session running, cost tracker keeps logging.
+
+### Session close event
+```python
+@session.on("close")
+def on_session_close():
+    # Write final cost report + transcript here
+    write_cost_report(...)
+```
 
 ---
 
-*Last updated: 2026-04-02*
+## 11. Agent Profile in Prompts (Gender/Name)
+
+### ✅ Always inject agent identity into system instructions
+All agents that generate free text must know:
+- Agent name (श्रेया)
+- Agent gender (female)
+- Correct Hindi verb forms (बोल रही, ले सकती, चाहती, etc.)
+
+This prevents the LLM from defaulting to masculine forms (बोल रहा, ले सकता).
+
+### Pattern
+```python
+AGENT_PROFILE = """
+YOUR IDENTITY:
+- Your name is {agent_name}. You are a FEMALE sales representative.
+- Always use FEMALE Hindi verb forms: बोल रही (not रहा), ले सकती (not सकता), चाहती (not चाहता)
+- When the script uses {bol_raha}, {le_sakta}, {chahta} etc, those are already gender-correct. USE THEM.
+"""
+```
+
+---
+
+## 12. Script-Following vs AI Generation
+
+### When to hardcode scripts (say_script):
+- Greetings, introductions, product pitches with specific wording
+- Pricing mentions, legal disclaimers
+- Goodbye messages
+- Any line where exact wording matters
+
+### When to let AI generate:
+- Responding to unexpected questions
+- Step4_ShareProduct (product pitch from KB data)
+- Handling objections naturally
+- Summarizing feedback
+
+### ✅ For scripted agents, use "SILENT listener" pattern:
+```python
+instructions = (
+    "You just said a greeting. LISTEN for the response. "
+    "Do NOT speak — only call the appropriate tool."
+)
+```
+The LLM only decides WHICH tool to call, never generates speech.
+
+### ⚠️ For AI-generating agents, use LANGUAGE_RULES + AGENT_PROFILE:
+```python
+instructions = f"{LANGUAGE_RULES}\n{AGENT_PROFILE}\n\nYour task: ..."
+```
+This ensures gender-correct, paced, natural Hinglish.
+
+---
+
+## 13. STT Misinterpretation ("Ji" → "JEE")
+
+### Known issue
+Sarvam Saaras:v3 in `codemix` mode can misinterpret Hindi filler words as English acronyms:
+- "जी" (ji = yes/respectful) → "JEE" (exam name)
+- "हाँ" (haan = yes) → "HAN" or similar
+
+### Mitigation
+- In `classes_shared` tool and KB routing, add guards against common false positives
+- Don't route on single short words — require minimum context
+- Add "ji" to tool descriptions as an affirmative, NOT as JEE
+
+---
+
+*Last updated: 2026-04-03*

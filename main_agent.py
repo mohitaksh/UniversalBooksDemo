@@ -178,7 +178,7 @@ async def entrypoint(ctx: JobContext):
         target_language_code="hi-IN",
         model="bulbul:v3",
         speaker=voice.tts_speaker,
-        # No speech_sample_rate — let Sarvam handle it
+        pace=1.65,  # 1.0 = too slow for sales calls; 1.65 = natural fast
     )
 
     stt_plugin = sarvam.STT(
@@ -308,25 +308,23 @@ async def entrypoint(ctx: JobContext):
 
     cost_task = asyncio.create_task(periodic_cost_log())
 
-    # ── Cleanup ──────────────────────────────────────────────
-    def shutdown_call(reason="room disconnected"):
-        full_log.info(f"Closing Session | Reason: {reason}")
+    # ── Cleanup (uses session 'close' event — fires reliably on session.shutdown(),
+    #    participant disconnect, room delete, etc.) ──
+    @session.on("close")
+    def on_session_close():
+        full_log.info("Session closing — writing final reports.")
         cost_task.cancel()
-        
-        # Gracefully shut down background audio to prevent WinError 10054 Proactor loop crash
-        if hasattr(userdata, "background_audio"):
-            asyncio.create_task(userdata.background_audio.aclose())
 
-        brief_log.info(f"CALL_END | {reason}")
+        # Gracefully shut down background audio to prevent WinError 10054 Proactor loop crash
+        if hasattr(userdata, "background_audio") and userdata.background_audio:
+            try:
+                asyncio.get_event_loop().create_task(userdata.background_audio.aclose())
+            except Exception:
+                pass
+
+        brief_log.info("CALL_END | session_closed")
         write_cost_report(tracker=tracker, full_log=full_log, cost_log=cost_log, brief_log=brief_log)
         full_log.info("Session closed.")
-    @ctx.room.on("disconnected")
-    def on_disconnected(*args):
-        shutdown_call("room disconnected")
-
-    @ctx.room.on("participant_disconnected")
-    def on_participant_disconnected(participant):
-        shutdown_call(f"participant {participant.identity} disconnected")
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -43,7 +43,7 @@ logger = logging.getLogger("flow.new_teacher")
 LANGUAGE_RULES = """
 LANGUAGE RULES (follow strictly):
 - Respond ONLY in Devanagari Hinglish — Hindi in Devanagari script mixed with English words kept in English.
-- Example: "जी, मैं Universal Books की तरफ़ से बोल रहा हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के दशक से teachers और coaching centers के लिए up-to-date exam preparation ki books aur material बनाते हैं."
+- Example: "जी, मैं Universal Books की तरफ़ से बोल रही हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के दशक से teachers और coaching centers के लिए up-to-date exam preparation ki books aur material बनाते हैं."
 - Always use "आप" (respectful). NEVER "तू" or "तुम".
 - Speak numbers in English: 1960 → Nineteen Sixty, 5000 → Five Thousand, 350 → Three Fifty, 60 → Sixty
 - Maximum 2-3 SHORT sentences per response. This is a voice call — keep it brief and punchy.
@@ -60,6 +60,16 @@ SPEECH STYLE (sound like a real sales rep on a call, NOT a bot):
 - React naturally to "ठीक है" / "ओके" / "हाँ" with brief acknowledgment before continuing.
 - When they say "ठीक है" you can say "जी बिल्कुल," or "हाँ सर," and then continue.
 - DON'T sound like you're reading a list. Weave features into a natural flow.
+"""
+
+AGENT_PROFILE = """
+YOUR IDENTITY:
+- Your name is {agent_name}. You are a FEMALE sales representative calling from Universal Books.
+- ALWAYS use FEMALE Hindi verb forms:
+  बोल रही (NOT बोल रहा), ले सकती (NOT ले सकता), चाहती (NOT चाहता),
+  समझ गयी (NOT समझ गया), कर देती (NOT कर देता)
+- The script templates use {{bol_raha}}, {{le_sakta}}, {{chahta}} etc — those are already gender-correct. But when YOU generate text, always use the feminine forms listed above.
+- Be professional but warm. You represent a 60-year-old publishing company.
 """
 
 
@@ -428,6 +438,17 @@ class Step3_AskClasses(BaseUBAgent):
     ) -> "Step4_ShareProduct":
         """Teacher shared their classes/exams (e.g. 'NEET and JEE', 'Class 9-12', 'Boards')."""
         ud = context.userdata
+
+        # ── STT Guard: filter false positives ──
+        # Sarvam STT can misinterpret "ji" (जी = respectful yes) as "JEE"
+        cleaned = classes_and_exams.strip().lower()
+        false_positives = {"ji", "jee", "haan", "ha", "ok", "theek hai", "boliye"}
+        if cleaned in false_positives or len(cleaned) <= 3:
+            # This is likely an affirmative, not a class name — ask again
+            logger.warning(f"STT guard: '{classes_and_exams}' looks like affirmative, re-asking")
+            await self.say_script("जी सर, मतलब आपके यहाँ कौन सी classes चलती हैं? जैसे NEET, JEE, Boards, या Class 9 10?")
+            return Step3_AskClasses()
+
         ud.exam_type = classes_and_exams
 
         if ud.tracker:
@@ -492,6 +513,7 @@ class Step4_ShareProduct(BaseUBAgent):
                 "- If they ask 'where did you get my number' or 'are you AI', "
                 "call handle_objection.\n\n"
                 f"{LANGUAGE_RULES}\n\n"
+                f"{AGENT_PROFILE}\n\n"
                 f"PRODUCT DATA:\n{kb_context}"
             ),
             **kwargs,

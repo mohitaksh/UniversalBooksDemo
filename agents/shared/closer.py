@@ -83,14 +83,14 @@ class CloserAgent(BaseUBAgent):
             except Exception as e:
                 logger.warning(f"N8N tag_lead webhook failed: {e}")
 
-        # Wait to let the goodbye TTS audio drain, then hang up
+        # Wait to let the goodbye TTS audio drain, then end the session
         import asyncio
-        await asyncio.sleep(5.0)
+        await asyncio.sleep(2.0)
         try:
-            logger.info(f"DISCONNECTING SIP CALL | {ud.caller_name}")
-            ud.ctx.room.disconnect()
+            logger.info(f"SHUTTING DOWN SESSION | {ud.caller_name}")
+            self.session.shutdown()  # Gracefully ends session → triggers room cleanup
         except Exception as e:
-            logger.error(f"Failed to disconnect room: {e}")
+            logger.error(f"Failed to shutdown session: {e}")
 
     @function_tool
     async def tag_lead(self, context: RunCtx, tag: str, notes: str = "") -> str:
