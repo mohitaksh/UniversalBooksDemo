@@ -94,12 +94,12 @@ S1_WRONG_PERSON = (
 # ═══════════════════════════════════════════════════════════════
 
 S2_INTRO = (
-    "जी {mera} naam {agent_name} hai, mai Universal Books se bol {bol_raha} हूँ।"
-    "हमारी .. Errorless के नाम se books आती हैं मार्केट मे, आपने शायद सुना होगा, जैसे - Errorless Physics जो नीट और जे-ई-ई के लिए बोहत famous हैं! .. जानते हैं आप?"
+    "जी {mera} naam {agent_name} है, मै  Universal Books से बोल {bol_raha} हूँ।"
+    "हमारी .. Errorless के नाम se books आती हैं मार्केट मे, आपने शायद सुना होगा, जैसे जो नीट और जे-ई-ई exams के लिए बोहत famous हैं! .. जानते हैं आप?"
 )
 
 S2_ASK_PERMISSION = (
-    "जी हा-हा, हम उन्ही बुक्स के पब्लिशर हैं ... आपसे बस दो मिनट बात करनी थी ... अभी बात कर सकते हैं?"
+    "जी हा, हम उन्ही बुक्स के पब्लिशर हैं ... और अब हम class sixth se twelfth tak ke liye CBSE boards ki books और Neet, जे ई ई और बाकी medical और engineering exams के लिए, Exam Preparation material बनाते हैं ... जिसपे हम आपकी coaching कि खुद कि branding लगा के देते हैं, बिना किसी extra charges के। और best बात यह है कि हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं .. और .. इसी वजह से हम directly सीधे आप लोगों से ही बात करना चाहते हैं ... तो क्या आप हमसे बस दो मिनट बात कर सकते हैं?"
 )
 
 S2_INTRO_MORE_THEN_ASK_PERMISSION = (
@@ -111,7 +111,7 @@ S2_INTRO_MORE_THEN_ASK_PERMISSION = (
 # ═══════════════════════════════════════════════════════════════
 
 S3_ASK_CLASSES = (
-    "जी, पहले तो मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है? सिर्फ boards की .. या नीट और जे-ई-ई-भी?"
+    "जी, पहले तो मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है? सिर्फ boards की .. या नीट और जे-ई-ई जैसे exams की भी?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -142,9 +142,8 @@ S6_OFFER_SAMPLE = (
 # ═══════════════════════════════════════════════════════════════
 
 S_HESITANT = (
-    """कोई issue कि बात नहीं है , आप आराम से content check kar lijiye,
-    अगर आपको और chapters भी चाहिए तो आप मुझे बता सकते हैं ।
-
+    """कोई issue कि बात नहीं है , हम आपको Samples WhatsApp par bhej देते हैं,आप आराम से content check kar lijiye,
+    हम आपको physical book भी arrange कर देंगे। हमारी team आपको call कर के और भी details share कर देगी।
     और बाद मे अगर ऑर्डर भी करना हो तोह हमारी मिनमम क्वानटिटी सिर्फ दस sets हैं। तो आप सिर्फ एक module मंगा के भी देख सकते हैं कि content कितना अच्छा है।
     """
 )
@@ -201,11 +200,51 @@ def resolve_kb_modules(classes_text: str) -> list[str]:
 
 
 # ═══════════════════════════════════════════════════════════════
-# STEP 1: GREETINGS
+# STEP 1a: WAIT FOR CALLER PICKUP
+# The agent sits silently until the person says "hello" / anything.
+# This prevents wasted TTS/LLM on unanswered or ringing calls.
 # ═══════════════════════════════════════════════════════════════
 
 class Step1_Greet(BaseUBAgent):
-    """Step 1: Greeting — confirm caller identity.
+    """Step 1a: Wait silently for the caller to pick up and speak first.
+    
+    When the phone rings, the SIP participant joins the room immediately
+    but the human hasn't answered yet. We wait for ANY speech from the
+    user before firing the greeting. This saves TTS/LLM costs on
+    unanswered calls.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            instructions=(
+                "The phone is ringing. You are WAITING for the person to pick up.\n"
+                "Do NOT speak until the person says something.\n"
+                "When the person says ANYTHING (hello, haan, ji, boliye, ha, "
+                "kya hai, kaun, etc.), call `caller_picked_up` immediately.\n"
+                "Do NOT generate any speech. ONLY call the tool."
+            ),
+            **kwargs,
+        )
+
+    async def on_enter(self) -> None:
+        # Don't speak — just wait for user's first utterance
+        logger.info("Step1_Greet | Waiting for caller to pick up...")
+
+    @function_tool
+    async def caller_picked_up(self, context: RunCtx, response: str = "hello") -> "Step1b_ConfirmIdentity":
+        """The caller picked up and said something (hello, haan, etc.). Start greeting."""
+        logger.info(f"Step1 → Caller picked up | heard: {response}")
+        return Step1b_ConfirmIdentity()
+
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 1b: GREET & CONFIRM IDENTITY
+# Now that the caller answered, say the greeting and wait for
+# identity confirmation.
+# ═══════════════════════════════════════════════════════════════
+
+class Step1b_ConfirmIdentity(BaseUBAgent):
+    """Step 1b: Say greeting → confirm caller identity.
     
     Branches based on call_client_type:
       - teacher: "क्या मेरी बात {name} से हो रही है जो coaching मे पढ़ाते हैं?"
@@ -215,8 +254,7 @@ class Step1_Greet(BaseUBAgent):
     def __init__(self, **kwargs):
         super().__init__(
             instructions=(
-                "You are calling a teacher/coaching center. You just said a greeting. "
-                "Listen for their response.\n"
+                "You just greeted the caller. Listen for their response.\n"
                 "- If they confirm they are the right person (haan, boliye, ji, ha), "
                 "call identity_confirmed.\n"
                 "- If wrong person (nahi, galat number, wrong number), call wrong_person.\n"
@@ -229,9 +267,6 @@ class Step1_Greet(BaseUBAgent):
         )
 
     async def on_enter(self) -> None:
-        # SIP audio establishment delay — 5 seconds (from working code)
-        await asyncio.sleep(5.0)
-
         # Branch greeting based on call_client_type
         client_type = self.ud.call_client_type
         if client_type == "institution":
@@ -242,7 +277,7 @@ class Step1_Greet(BaseUBAgent):
     @function_tool
     async def identity_confirmed(self, context: RunCtx, response: str = "confirmed") -> "Step2_Intro":
         """Person confirmed they are the right contact. response is what they said."""
-        logger.info(f"Step1 → Step2 | {response}")
+        logger.info(f"Step1b → Step2 | {response}")
         return Step2_Intro()
 
     @function_tool

@@ -43,6 +43,7 @@ from livekit.agents import (
     AudioConfig,
     BuiltinAudioClip,
     cli,
+    room_io,
 )
 from livekit.plugins import sarvam, openai
 
@@ -178,7 +179,7 @@ async def entrypoint(ctx: JobContext):
         target_language_code="hi-IN",
         model="bulbul:v3",
         speaker=voice.tts_speaker,
-        pace=1.65,  # 1.0 = too slow for sales calls; 1.65 = natural fast
+        pace=1.2,  # 1.0 = too slow for sales calls; 1.65 = natural fast
     )
 
     stt_plugin = sarvam.STT(
@@ -279,7 +280,13 @@ async def entrypoint(ctx: JobContext):
 
     # ── Start session ────────────────────────────────────────
     full_log.info("Agent Session starting — multi-agent architecture.")
-    await session.start(room=ctx.room, agent=entry_agent)
+    await session.start(
+        room=ctx.room,
+        agent=entry_agent,
+        room_options=room_io.RoomOptions(
+            delete_room_on_close=True,  # Deletes room on shutdown → disconnects SIP call
+        ),
+    )
 
     # ── Background Audio (office ambience + keyboard typing) ──
     # Volume is a gain multiplier, NOT 0-1.  3.0 = amplify 3x.
