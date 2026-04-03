@@ -137,8 +137,8 @@ class CallUserData:
 USD_TO_INR               = 95.0
 PRICE_TTS_PER_10K_CHARS  = 30.0   # INR
 PRICE_STT_PER_MIN        = 0.50   # INR
-PRICE_LLM_INPUT_PER_1M   = 2.00   # USD (Groq approx)
-PRICE_LLM_OUTPUT_PER_1M  = 8.00  # USD
+PRICE_LLM_INPUT_PER_1M   = 0.4   # USD (OpenAI)
+PRICE_LLM_OUTPUT_PER_1M  = 1.6  # USD (OpenAI)
 
 
 @dataclass

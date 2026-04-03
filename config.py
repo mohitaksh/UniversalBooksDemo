@@ -17,7 +17,7 @@ SIP_OUTBOUND_TRUNK_ID = os.getenv("SIP_OUTBOUND_TRUNK_ID", "")
 
 # ─── LLM ────────────────────────────────────────────────────
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o")
+OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
 # ─── Sarvam ─────────────────────────────────────────────────
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
