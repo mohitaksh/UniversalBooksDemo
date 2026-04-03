@@ -33,7 +33,7 @@ logger = logging.getLogger("flow.physical_sample_2")
 # ═══════════════════════════════════════════════════════════════
 
 S1_GREETING = (
-    "Hello {caller_name} sir, mai {agent_name} bol {bol_raha} hूँ, "
+    "Hello {caller_name} sir, mai {agent_name} bol {bol_raha} हूँ, "
     "Universal Books se। How are you sir?"
 )
 
@@ -44,7 +44,7 @@ S2_CHECK_PARCEL = (
 S3_NOT_RECEIVED = (
     "Okay sir, humare team ke according parcel deliver hua hai। "
     "Please check if someone from your office have received it। "
-    "Mai apni team ko inform kar {kar_deta} hूँ, "
+    "Mai apni team ko inform kar {kar_deta} हूँ, "
     "woh check karenge aapko parcel kyu nahi mila abhi tak।"
 )
 

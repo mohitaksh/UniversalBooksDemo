@@ -44,7 +44,7 @@ S1_GREETING = (
 )
 
 S1_WRONG_PERSON = (
-    "Sorry sir, Aapko disturb karne ke liye maafi {chahta} hूँ।"
+    "Sorry sir, Aapko disturb karne ke liye maafi {chahta} हूँ।"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -52,12 +52,8 @@ S1_WRONG_PERSON = (
 # ═══════════════════════════════════════════════════════════════
 
 S2_INTRO = (
-    "Ji sir, {mera} naam {agent_name} hai, mai Universal Books se bol {bol_raha} hूँ। "
-    "Humari Errorless book aati hai NEET aur J double E ke liye, "
-    "aur ab hum customized study material bhi banate hai Class 6 se 12 tak। "
-    "We publish books for CBSE, aur test prep material for NEET, J double E "
-    "aur other Medical and Engineering exams ke liye। "
-    "Kya mai aapka ek minute le {le_sakta} hूँ?"
+    "जी {mera} naam {agent_name} hai, mai Universal Books se bol {bol_raha} हूँ। हम एक साठ साल पुरानी publishing company हैं। "
+    "हमारी  Errorless book आती है नीट और जे-ई-ई के लिए आपने सुना होगा, अब हम कोचिंगस के लिए study material भी बनाते है जिसपे आपकी खुद की branding लगती है और उस branding को लगाने का कोई एक्स्ट्रा चार्ज भी नहीं लगता। क्या मै आपका एक मिनट {le_sakta} हूँ?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -65,7 +61,7 @@ S2_INTRO = (
 # ═══════════════════════════════════════════════════════════════
 
 S3_ASK_CLASSES = (
-    "Sir, aapke yahan kis classes aur exams ki coaching hoti hai?"
+    "जी, मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -77,8 +73,8 @@ S3_ASK_CLASSES = (
 S45_AI_INSTRUCTION = (
     "Based on the product data below, share 2-3 key highlights NATURALLY "
     "in Hinglish. Be specific — mention subject names, number of questions, "
-    "unique features. Then mention that books pe unke institute ki branding "
-    "lagti hai free of cost. After sharing, call offer_sample."
+    "unique features. "
+    "After sharing, call offer_sample."
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -86,10 +82,8 @@ S45_AI_INSTRUCTION = (
 # ═══════════════════════════════════════════════════════════════
 
 S6_OFFER_SAMPLE = (
-    "Sir maine aapko humare content ka ek digital sample share kiya hai "
-    "WhatsApp par, aap dekh sakte hai। Agar aapko physical book bhi "
-    "dekhni hai toh bhi arrange ho jayega। "
-    "Kya mai aapki call humare senior ke saath setup kar dूँ?"
+    "Okay तोह मैंने आपको WhatsApp पर sample share कर दिया है, और अगर आपको physical book भी देखनी है, तो वोह भी हम अरैन्ज कर देंगे।"
+    "आप आराम से sample देख लीजिए, मुझे यकीन है आपको कुछ Market से अलग ही लगेगा। हम आपको बाद मे call कर के और भी details share कर देंगे"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -97,14 +91,14 @@ S6_OFFER_SAMPLE = (
 # ═══════════════════════════════════════════════════════════════
 
 S_HESITANT = (
-    "No issues sir, aap ek baar content check kar le, agar aapko aur chapters bhi "
+    "कोई issue nahi sir, aap ek baar content check kar le, agar aapko aur chapters bhi "
     "chaiye toh aap mujko bata sakte hai। Humari team aapko visit bhi kar legi। "
     "Furthermore sir, our minimum quantity is just 10 sets so you can even "
     "get a single module to see if our branded material makes an impact।"
 )
 
 S_NOT_INTERESTED = (
-    "No issues sir, I understand। Please let us know if and when you change your mind।"
+    "No issues sir, I understand। Please let us know if and when you change your mind"
 )
 
 S_BUSY = (
@@ -338,12 +332,11 @@ class Step4_ShareProduct(BaseUBAgent):
                 "Use the product details below to describe what Universal Books "
                 "offers for their classes NATURALLY in Hinglish. "
                 "Be specific — mention subject names, number of questions, unique features. "
-                "Mention that books pe unke institute ki branding lagti hai free of cost. "
                 "IMPORTANT: If worksheet data is present, only mention worksheets for the "
                 "classes the teacher actually teaches, NOT all available classes. "
                 "Keep it conversational, 3-4 sentences max.\n"
-                "After the person responds, if they want to see samples or know more, "
-                "call offer_sample. If they raise concerns, call handle_hesitation. "
+                "After the person responds: if they want to see samples or know more, call offer_sample."
+                "or if they raise concerns, call handle_hesitation. "
                 "If not interested at all, call not_interested.\n"
                 "- If they ask 'where did you get my number' or 'are you AI', "
                 "call handle_objection.\n\n"

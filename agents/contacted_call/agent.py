@@ -31,12 +31,12 @@ from agents.shared.objection_handler import ObjectionAgent, S_NUMBER_SOURCE, S_A
 
 S1_GREETING = (
     "Hello, kya meri baat {caller_name} se ho rahi hai? "
-    "Mai {agent_name} bol {bol_raha} hूँ, Universal Books se। How are you sir?"
+    "Mai {agent_name} bol {bol_raha} हूँ, Universal Books se। How are you sir?"
 )
 
 S2_RECALL = (
     "Sir, humne pehle bhi aapko call kiya tha Universal Books ki taraf se। "
-    "Mai follow up ke liye call kar {bol_raha} hूँ।"
+    "Mai follow up ke liye call kar {bol_raha} हूँ।"
 )
 
 S3_ASK_INTEREST = (

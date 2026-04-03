@@ -34,7 +34,7 @@ logger = logging.getLogger("flow.physical_sample")
 
 S1_GREETING = (
     "Hello, kya meri baat {caller_name} se ho rahi hai? "
-    "Mai {agent_name} bol {bol_raha} hूँ, Universal Books se। How are you sir?"
+    "Mai {agent_name} bol {bol_raha} हूँ, Universal Books se। How are you sir?"
 )
 
 S2_RECALL = (
@@ -43,7 +43,7 @@ S2_RECALL = (
 )
 
 S3_NOT_RECEIVED = (
-    "Okay sir, mai apni team ko inform kar {kar_deta} hूँ, "
+    "Okay sir, mai apni team ko inform kar {kar_deta} हूँ, "
     "woh check karenge aapko parcel kyu nahi mila abhi tak।"
 )
 

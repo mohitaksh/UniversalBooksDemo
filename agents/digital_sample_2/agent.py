@@ -33,7 +33,7 @@ logger = logging.getLogger("flow.digital_sample_2")
 
 S1_GREETING = (
     "Hello {caller_name} sir, how are you? "
-    "Mai {agent_name}, Universal Books se bol {bol_raha} hूँ।"
+    "Mai {agent_name}, Universal Books se bol {bol_raha} हूँ।"
 )
 
 S2_RECALL = (
@@ -42,12 +42,12 @@ S2_RECALL = (
 )
 
 S3_NOT_SEEN = (
-    "No issues sir, mai files dobara send kar {kar_deta} hूँ aapko। "
+    "No issues sir, mai files dobara send kar {kar_deta} हूँ aapko। "
     "Please aap usko check kare aur humko bataiye kaisa laga।"
 )
 
 S3_INCENTIVE = (
-    "Mai aapko free test papers bhi send kar {kar_deta} hूँ "
+    "Mai aapko free test papers bhi send kar {kar_deta} हूँ "
     "aapke classroom ke liye, aap download aur print kar sakte hai sir।"
 )
 

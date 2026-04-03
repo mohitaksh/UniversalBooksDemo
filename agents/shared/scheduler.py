@@ -27,7 +27,7 @@ logger = logging.getLogger("agents.scheduler")
 # ═══════════════════════════════════════════════════════════════
 
 SETUP_CALL = (
-    "Sir, our senior will call you within the next 1 hour. "
+    "Sir, our senior will call you within the next 2~3 hours. "
     "Aapke paas koi specific time hai jo better ho?"
 )
 

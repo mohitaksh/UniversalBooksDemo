@@ -35,7 +35,7 @@ logger = logging.getLogger("flow.digital_sample")
 
 S1_GREETING = (
     "Hello, kya meri baat {caller_name} se ho rahi hai? "
-    "Mai {agent_name} bol {bol_raha} hूँ, Universal Books se। How are you sir?"
+    "Mai {agent_name} bol {bol_raha} हूँ, Universal Books se। How are you sir?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -60,7 +60,7 @@ S3_FOLLOWUP = (
 # ═══════════════════════════════════════════════════════════════
 
 S4_NOT_SEEN = (
-    "No issues sir, mai files dobara send kar {kar_deta} hूँ aapko। "
+    "No issues sir, mai files dobara send kar {kar_deta} हूँ aapko। "
     "Please aap usko check kare aur humko bataiye kaisa laga।"
 )
 

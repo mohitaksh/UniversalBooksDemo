@@ -33,12 +33,12 @@ logger = logging.getLogger("flow.visit_followup")
 
 S1_GREETING = (
     "Hello, kya meri baat {caller_name} se ho rahi hai? "
-    "Mai {agent_name} bol {bol_raha} hूँ, Universal Books se। How are you sir?"
+    "Mai {agent_name} bol {bol_raha} हूँ, Universal Books se। How are you sir?"
 )
 
 S2_RECALL = (
     "Sir, aapko recently humare team member ne visit kiya tha। "
-    "Mai unki behalf par call kar {bol_raha} hूँ aapka feedback lene ke liye "
+    "Mai unki behalf par call kar {bol_raha} हूँ aapka feedback lene ke liye "
     "aur agar koi query hai toh solve karne ke liye।"
 )
 

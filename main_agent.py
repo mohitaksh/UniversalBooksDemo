@@ -44,10 +44,10 @@ from livekit.agents import (
     BuiltinAudioClip,
     cli,
 )
-from livekit.plugins import sarvam, groq
+from livekit.plugins import sarvam, openai
 
 # Local imports
-from config import GROQ_MODEL
+from config import OPENAI_MODEL
 from models import (
     CallType,
     CallUserData,
@@ -185,8 +185,8 @@ async def entrypoint(ctx: JobContext):
         # No VAD — Sarvam has built-in voice detection
     )
 
-    llm_plugin = groq.LLM(
-        model=GROQ_MODEL,
+    llm_plugin = openai.LLM(
+        model=OPENAI_MODEL,
     )
 
     # ── Session ────────────────────────────────────────────

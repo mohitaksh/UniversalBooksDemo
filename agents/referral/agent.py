@@ -28,14 +28,14 @@ from agents.shared.objection_handler import ObjectionAgent, S_NUMBER_SOURCE, S_A
 
 S1_GREETING = (
     "Hello, kya meri baat {caller_name} se ho rahi hai? "
-    "Mai {agent_name} bol {bol_raha} hूँ, Universal Books se।"
+    "Mai {agent_name} bol {bol_raha} हूँ, Universal Books se।"
 )
 
 S2_REFERRAL = (
     "Sir, aapke baare mein humko referral mila hai। "
     "Unhone bataya ki aap coaching classes lete hai। "
     "Hum customized study material banate hai teachers ke liye। "
-    "Kya mai aapka ek minute le {le_sakta} hूँ?"
+    "Kya mai aapka ek minute le {le_sakta} हूँ?"
 )
 
 S_NOT_INTERESTED = (
