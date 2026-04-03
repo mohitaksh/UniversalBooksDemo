@@ -94,4 +94,10 @@ def kb_to_prompt(module_name: str) -> str:
     if data.get("extra_notes"):
         lines.append(f"Notes: {data['extra_notes']}")
 
+    if data.get("scripts"):
+        lines.append("")
+        lines.append("SAMPLE SCRIPTS (use these exact phrasings as reference for natural speech):")
+        for i, script in enumerate(data["scripts"], 1):
+            lines.append(f"  Script {i}: \"{script}\"")
+
     return "\n".join(lines)

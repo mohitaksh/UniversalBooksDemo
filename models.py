@@ -93,6 +93,7 @@ class CallUserData:
     caller_name: str = "Prakash"
     phone_number: str = ""
     call_type: CallType = CallType.NEW_TEACHER_COACHING
+    call_client_type: str = "teacher"  # "teacher" or "institution"
 
     # Voice for this call
     voice: Optional[VoiceProfile] = None

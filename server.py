@@ -50,11 +50,16 @@ class CallRequest(BaseModel):
       followup_physical_sample_1, followup_physical_sample_2,
       followup_visit, contacted_physically, contacted_call, referral
 
+    call_client_type: "teacher" or "institution"
+      - teacher: individual tuition teacher (greeting uses their name)
+      - institution: coaching center / school (greeting uses institution name)
+
     Legacy values also accepted: "name" → new_teacher_tuition, "institution" → new_teacher_coaching
     """
     name: str
     phone_number: str
     call_type: str = "new_teacher_coaching"
+    call_client_type: str = "teacher"
 
 
 # ─── Health Check ────────────────────────────────────────────
@@ -88,6 +93,7 @@ async def make_outbound_call(req: CallRequest):
         "name": req.name,
         "phone_number": phone,
         "call_type": req.call_type,
+        "call_client_type": req.call_client_type,
     })
 
     logger.info(f"CALL REQUEST | {req.name} | {phone} | type={req.call_type}")
@@ -122,6 +128,7 @@ async def make_outbound_call(req: CallRequest):
             "room_name": room_name,
             "phone": phone,
             "call_type": req.call_type,
+            "call_client_type": req.call_client_type,
         }
 
     except Exception as e:

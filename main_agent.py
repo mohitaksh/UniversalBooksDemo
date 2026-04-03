@@ -121,6 +121,7 @@ async def entrypoint(ctx: JobContext):
     caller_name = "Prakash"
     phone_number = ""
     call_type_str = "new_teacher_coaching"
+    call_client_type = "teacher"
 
     # Connect first so ctx.room.metadata is available
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -136,6 +137,7 @@ async def entrypoint(ctx: JobContext):
         caller_name = meta.get("name", "sir") or "sir"
         call_type_str = meta.get("call_type", "new_teacher_coaching") or "new_teacher_coaching"
         phone_number = meta.get("phone_number", meta.get("phone", "")) or ""
+        call_client_type = meta.get("call_client_type", "teacher") or "teacher"
     except Exception as e:
         logging.getLogger("entrypoint").warning(f"Metadata parse error: {e}")
 
@@ -160,6 +162,7 @@ async def entrypoint(ctx: JobContext):
         caller_name=caller_name,
         phone_number=phone_number,
         call_type=call_type,
+        call_client_type=call_client_type,
         voice=voice,
         tracker=tracker,
         call_id=call_id,

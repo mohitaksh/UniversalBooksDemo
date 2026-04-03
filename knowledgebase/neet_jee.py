@@ -2,6 +2,7 @@
 NEET & JEE Study Module
 ────────────────────────
 EDIT THIS DATA with your actual product details.
+Add/edit "scripts" list with exact phrases you want the AI to use.
 """
 
 DATA = {
@@ -22,4 +23,14 @@ DATA = {
     "usp": "All-in-one competitive prep — teachers save massive research time",
     "best_for": "Coaching centers running 2-year NEET & JEE programs",
     "extra_notes": "Content updated every year to match latest exam patterns",
+
+    # ─── SCRIPTS ───────────────────────────────────────────────
+    # Exact phrases the AI should use as reference when talking
+    # about this product. Edit these to match your sales style.
+    # ──────────────────────────────────────────────────────────
+    "scripts": [
+        "11 12th में जो हम लोग की NEET और JEE की books आ रही हैं, उसमें जो है सर हम लोगों ने एक topic topic के बाद जो है, एक दो examples हैं, examples के बाद Eight से Ten questions हैं ताकि class में revise कर सके।",
+        "उसके साथ Three Fifty से ज्यादा topic-wise MCQs हैं हर chapter में, और past Ten year के NEET JEE questions year tags के साथ add हैं, ताकि students को पता चले कि कौन सा topic कितना important है।",
+        "और सर best बात ये है कि NCERT Exemplar questions भी add हैं, और एक separate solution module मिलता है, तो teacher को अलग से answers ढूंढने कि जरुरत नहीं पड़ती।",
+    ],
 }

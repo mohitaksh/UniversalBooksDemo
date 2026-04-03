@@ -2,16 +2,17 @@
 NEW TEACHER — Cold Call Flow (Coaching / Tuition)
 ═════════════════════════════════════════════════
 
-8-step flow for calling a new teacher who has never been contacted.
+Flow:
+  Step 1: Greetings — Confirm identity (teacher vs institution greeting)
+  Step 2: Intro — "Do you know Errorless books?" (authority check)
+    → YES: Ask permission (S2_ASK_PERMISSION)
+    → NO:  Build authority + ask permission (S2_INTRO_MORE_THEN_ASK_PERMISSION)
+  Step 2b: Permission — Wait for "haan boliye" / "no"
+  Step 3: Ask Classes — What classes/exams they teach
+  Step 4: Share Product — AI-generated from KB data (with language rules)
+  Step 6: Offer Sample — Digital + physical sample offer
 
-Step 1: Greetings — Get & Confirm Name
-Step 2: Intro of Company — 10 second intro
-Step 3: Ask for Classes — What classes/exams they teach
-Step 4: Share Relevant Product — AI-generated from KB data
-Step 5: Share Relevant USP — AI-generated from KB data
-Step 6: Ask & Share Sample — Offer digital sample + physical book
-Step 7: Set up call with Senior — Create task via N8N
-Step 8: Good Wishes — Close
+  OBJECTION / BUSY / NOT INTERESTED can fire at ANY stage.
 
 EDIT YOUR SCRIPTS: Modify the constants below each ═══ header.
 Template variables: {agent_name}, {caller_name}, {bol_raha}, {le_sakta},
@@ -33,6 +34,33 @@ from knowledgebase import kb_to_prompt
 from agents.shared.objection_handler import ObjectionAgent, S_NUMBER_SOURCE, S_AI_RESPONSE
 
 logger = logging.getLogger("flow.new_teacher")
+
+
+# ═══════════════════════════════════════════════════════════════
+# LANGUAGE RULES — injected into ALL agents that generate free text
+# ═══════════════════════════════════════════════════════════════
+
+LANGUAGE_RULES = """
+LANGUAGE RULES (follow strictly):
+- Respond ONLY in Devanagari Hinglish — Hindi in Devanagari script mixed with English words kept in English.
+- Example: "जी, मैं Universal Books की तरफ़ से बोल रहा हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के दशक से teachers और coaching centers के लिए up-to-date exam preparation ki books aur material बनाते हैं."
+- Always use "आप" (respectful). NEVER "तू" or "तुम".
+- Speak numbers in English: 1960 → Nineteen Sixty, 5000 → Five Thousand, 350 → Three Fifty, 60 → Sixty
+- Maximum 2-3 SHORT sentences per response. This is a voice call — keep it brief and punchy.
+- One question at a time. Never stack questions.
+- Use natural filler: "जी", "हाँ", "देखिए", "actually"
+- Mirror the caller's energy — brief when they're rushed, slightly elaborate when they're curious.
+- Use "mai" instead of "main" to avoid confusions with english words like "main" for TTS.
+
+SPEECH STYLE (sound like a real sales rep on a call, NOT a bot):
+- Talk about specific features conversationally, like you're explaining to a colleague.
+- Example good: "और 9 10th में इस बार हम लोगों ने specially कई चीजें और add कर दी हैं, जैसे 1 marks, 2 marks, 3 marks, 5 marks questions, NCERT के questions और CBSE PYQ Twenty Six तक के add हैं"
+- Example good: "हर एक chapter के बाद एक chapter test डाल रहे हैं, जैसे board में exam में पूछा जाता है"
+- Example good: "ताकि एक book अगर बच्चा खरीदे तो सर पूरा का पूरा cover हो जाए, अलग अलग books use ना करनी पड़ें"
+- React naturally to "ठीक है" / "ओके" / "हाँ" with brief acknowledgment before continuing.
+- When they say "ठीक है" you can say "जी बिल्कुल," or "हाँ सर," and then continue.
+- DON'T sound like you're reading a list. Weave features into a natural flow.
+"""
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -64,7 +92,7 @@ S2_ASK_PERMISSION = (
     "जी हा-हा, हम उन्ही बुक्स के पब्लिशर हैं, आपसे बस दो मिनट बात करनी थी - अभी कर {le_sakta} हूँ?"
 )
 
-S2_INTRO_MORE = (
+S2_INTRO_MORE_THEN_ASK_PERMISSION = (
     "आच्छा, आप नहीं जानते तोह मै बता दु मैं Universal Books की तरफ़ से बोल {bol_raha} हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के समय से exam preparation ki books aur material बनाते आ रहे हैं। और अब हम coaching institutes और teachers के लिए भी study material बनाते हैं - जिसपे हम उनकी खुद कि branding लगा के देते हैं बिना किसी extra charges के। और best बात - हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं, और इसलिए भी हम आप लोगों से directly ही deal करते हैं। तो बस दो minute बात करेंगे आप?"
 )
 
@@ -73,7 +101,7 @@ S2_INTRO_MORE = (
 # ═══════════════════════════════════════════════════════════════
 
 S3_ASK_CLASSES = (
-    "जी, पहले तो मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है? सिर्फ boards वघेरा या नीट और जे-ई-ई-भी?"
+    "जी, पहले तो मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है? सिर्फ boards वघेरा या नीट और जे-ई-ई-भी?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -87,17 +115,6 @@ S45_AI_INSTRUCTION = (
     in Hinglish. Be specific — mention subject names, number of questions, 
     unique features. 
     After sharing, call offer_sample.
-
-    LANGUAGE RULES (follow strictly):
-    - Respond ONLY in Devanagari Hinglish — Hindi in Devanagari script mixed with English words kept in English.
-    - Example: "जी, मैं Universal Books की तरफ़ से बोल रहा हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के दशक से teachers और coaching centers के लिए up-to-date exam preparation ki books aur material बनाते हैं."
-    - Always use "आप" (respectful). NEVER "तू" or "तुम".
-    - Speak numbers in English: 1960 → Nineteen Sixty, 5000 → Five Thousand, 350 → Three Fifty, 60 → Sixty
-    - Maximum 2-3 SHORT sentences per response. This is a voice call.
-    - One question at a time. Never stack questions.
-    - Use natural filler: "जी", "हाँ", "देखिए", "actually"
-    - Mirror the caller's energy — brief when they're rushed, slightly elaborate when they're curious.
-    - use "mai" instead of "main" to avoid confusions with english words like "main" for TTS
     """
 )
 
@@ -178,17 +195,22 @@ def resolve_kb_modules(classes_text: str) -> list[str]:
 # ═══════════════════════════════════════════════════════════════
 
 class Step1_Greet(BaseUBAgent):
-    """Step 1: Greeting — confirm caller identity."""
+    """Step 1: Greeting — confirm caller identity.
+    
+    Branches based on call_client_type:
+      - teacher: "क्या मेरी बात {name} से हो रही है जो coaching मे पढ़ाते हैं?"
+      - institution: "क्या ये number {name} का है?"
+    """
 
     def __init__(self, **kwargs):
         super().__init__(
             instructions=(
-                "You are calling a teacher. You just said a greeting. "
+                "You are calling a teacher/coaching center. You just said a greeting. "
                 "Listen for their response.\n"
-                "- If they confirm they are the right person (haan, boliye, ji), "
+                "- If they confirm they are the right person (haan, boliye, ji, ha), "
                 "call identity_confirmed.\n"
-                "- If wrong person, call wrong_person.\n"
-                "- If they're busy, call person_busy.\n"
+                "- If wrong person (nahi, galat number, wrong number), call wrong_person.\n"
+                "- If they're busy (busy, baad me, class chal rahi, abhi nahi), call person_busy.\n"
                 "- If they ask 'where did you get my number' or 'are you AI', "
                 "call handle_objection.\n"
                 "Do NOT speak — only call tools."
@@ -199,7 +221,13 @@ class Step1_Greet(BaseUBAgent):
     async def on_enter(self) -> None:
         # SIP audio establishment delay — 5 seconds (from working code)
         await asyncio.sleep(5.0)
-        await self.say_script(S1_GREETING)
+
+        # Branch greeting based on call_client_type
+        client_type = self.ud.call_client_type
+        if client_type == "institution":
+            await self.say_script(S1_GREETING_INSTITUTION)
+        else:
+            await self.say_script(S1_GREETING_TEACHER)
 
     @function_tool
     async def identity_confirmed(self, context: RunCtx, response: str = "confirmed") -> "Step2_Intro":
@@ -232,20 +260,31 @@ class Step1_Greet(BaseUBAgent):
 
 
 # ═══════════════════════════════════════════════════════════════
-# STEP 2: COMPANY INTRO
+# STEP 2: COMPANY INTRO — "Do you know Errorless books?"
 # ═══════════════════════════════════════════════════════════════
 
 class Step2_Intro(BaseUBAgent):
-    """Step 2: Company intro — 10 second pitch."""
+    """Step 2: Company intro — ask 'do you know Errorless books?'
+    
+    This is an authority check:
+    - If they know → S2_ASK_PERMISSION (short: "hum unhi ke publisher hain, 2 min?")
+    - If they don't → S2_INTRO_MORE_THEN_ASK_PERMISSION (long authority build + ask permission)
+    
+    Both paths end with asking permission, then hand off to Step2b_Permission.
+    """
 
     def __init__(self, **kwargs):
         super().__init__(
             instructions=(
-                "You just introduced the company. Listen for the person's response.\n"
-                "- If they give permission to continue (haan, boliye, bataiye), "
-                "call permission_granted.\n"
-                "- If they say not interested or don't call, call not_interested.\n"
-                "- If busy, call person_busy.\n"
+                "You just introduced yourself and asked if they know about Errorless books. "
+                "Listen for their response.\n"
+                "- If they say YES, they know Errorless (haan, pata hai, suna hai, jaante hain, errorless jaante hain), "
+                "call knows_errorless.\n"
+                "- If they say NO, they don't know (nahi, nahi pata, kya hai ye, nahi suna), "
+                "call doesnt_know_errorless.\n"
+                "- If they say not interested or don't call (interest nahi, mat call karo, don't call), "
+                "call not_interested.\n"
+                "- If busy (busy, baad me, class chal rahi, abhi nahi), call person_busy.\n"
                 "- If they ask 'where did you get my number' or 'are you AI', "
                 "call handle_objection.\n"
                 "Do NOT speak — only call tools."
@@ -257,8 +296,79 @@ class Step2_Intro(BaseUBAgent):
         await self.say_script(S2_INTRO)
 
     @function_tool
+    async def knows_errorless(self, context: RunCtx, response: str = "yes") -> "Step2b_Permission":
+        """They know about Errorless books. Ask for 2 minutes of their time."""
+        logger.info(f"Step2 → knows Errorless | {response}")
+        await self.say_script(S2_ASK_PERMISSION)
+        return Step2b_Permission()
+
+    @function_tool
+    async def doesnt_know_errorless(self, context: RunCtx, response: str = "no") -> "Step2b_Permission":
+        """They don't know Errorless. Build authority with full intro, then ask permission."""
+        logger.info(f"Step2 → doesn't know Errorless, building authority | {response}")
+        await self.say_script(S2_INTRO_MORE_THEN_ASK_PERMISSION)
+        return Step2b_Permission()
+
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "no") -> "BaseUBAgent":
+        """Person is not interested."""
+        await self.say_script(S_NOT_INTERESTED)
+        from agents.shared.closer import CloserAgent
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> "BaseUBAgent":
+        """Person is busy right now."""
+        await self.say_script(S_BUSY)
+        from agents.shared.scheduler import SchedulerAgent
+        return SchedulerAgent()
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Person raised an objection."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_Intro())
+
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 2b: WAIT FOR PERMISSION
+# ═══════════════════════════════════════════════════════════════
+
+class Step2b_Permission(BaseUBAgent):
+    """Step 2b: Permission gate — wait for 'yes continue' or 'no'.
+    
+    The previous agent (Step2_Intro) already said the permission-asking
+    script. This agent just listens for the response.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(
+            instructions=(
+                "You just asked the person for 2 minutes of their time. "
+                "Listen for their response.\n"
+                "- If they give permission (haan, boliye, bataiye, ha bolo, theek hai, ok), "
+                "call permission_granted.\n"
+                "- If not interested (nahi, interest nahi, mat bolo, don't call), "
+                "call not_interested.\n"
+                "- If busy (busy, baad me, class chal rahi, abhi nahi), call person_busy.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
+                "Do NOT speak — only call tools."
+            ),
+            **kwargs,
+        )
+
+    async def on_enter(self) -> None:
+        # No speech — the previous agent already said the permission script
+        pass
+
+    @function_tool
     async def permission_granted(self, context: RunCtx, response: str = "yes") -> "Step3_AskClasses":
-        """Person gave permission to continue."""
+        """Person gave permission to continue talking."""
+        logger.info(f"Step2b → Permission granted | {response}")
         return Step3_AskClasses()
 
     @function_tool
@@ -299,6 +409,7 @@ class Step3_AskClasses(BaseUBAgent):
                 "Listen for their answer. When they tell you "
                 "(e.g. 'NEET', '9th to 12th', 'JEE and Boards'), "
                 "call classes_shared with the info.\n"
+                "- If busy (busy, baad me, class chal rahi), call person_busy.\n"
                 "- If they ask 'where did you get my number' or 'are you AI', "
                 "call handle_objection.\n"
                 "Do NOT speak — only call tools."
@@ -326,6 +437,13 @@ class Step3_AskClasses(BaseUBAgent):
         return Step4_ShareProduct(kb_modules=kb_modules)
 
     @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> "BaseUBAgent":
+        """Person is busy right now."""
+        await self.say_script(S_BUSY)
+        from agents.shared.scheduler import SchedulerAgent
+        return SchedulerAgent()
+
+    @function_tool
     async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
         """Person raised an objection."""
         if "number" in objection.lower() or "kahan" in objection.lower():
@@ -340,7 +458,11 @@ class Step3_AskClasses(BaseUBAgent):
 # ═══════════════════════════════════════════════════════════════
 
 class Step4_ShareProduct(BaseUBAgent):
-    """Step 4-5: Share relevant product info using KB data (AI-generated)."""
+    """Step 4-5: Share relevant product info using KB data (AI-generated).
+    
+    Language rules and speech style instructions are injected here
+    so the LLM generates natural Hinglish like a real caller.
+    """
 
     def __init__(self, kb_modules: list[str] = None, **kwargs):
         self._kb_modules = kb_modules or ["neet_jee"]
@@ -359,12 +481,17 @@ class Step4_ShareProduct(BaseUBAgent):
                 "Be specific — mention subject names, number of questions, unique features. "
                 "IMPORTANT: If worksheet data is present, only mention worksheets for the "
                 "classes the teacher actually teaches, NOT all available classes. "
-                "Keep it conversational, 3-4 sentences max.\n"
-                "After the person responds: if they want to see samples or know more, call offer_sample."
-                "or if they raise concerns, call handle_hesitation. "
+                "Keep it conversational, 2-3 sentences max.\n\n"
+                "If there are SAMPLE SCRIPTS in the product data, USE THEM as reference "
+                "for how to phrase things. You can adapt them but keep the natural tone.\n\n"
+                "After the person responds positively (ठीक है, ओके, हाँ, अच्छा): "
+                "if they want to see samples or know more, call offer_sample. "
+                "Or if they raise concerns, call handle_hesitation. "
                 "If not interested at all, call not_interested.\n"
+                "- If busy (busy, baad me, class chal rahi), call person_busy.\n"
                 "- If they ask 'where did you get my number' or 'are you AI', "
                 "call handle_objection.\n\n"
+                f"{LANGUAGE_RULES}\n\n"
                 f"PRODUCT DATA:\n{kb_context}"
             ),
             **kwargs,
@@ -394,6 +521,13 @@ class Step4_ShareProduct(BaseUBAgent):
         return CloserAgent(tag="Not Interested")
 
     @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> "BaseUBAgent":
+        """Person is busy right now."""
+        await self.say_script(S_BUSY)
+        from agents.shared.scheduler import SchedulerAgent
+        return SchedulerAgent()
+
+    @function_tool
     async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
         """Person raised an objection."""
         if "number" in objection.lower() or "kahan" in objection.lower():
@@ -418,6 +552,7 @@ class Step6_OfferSample(BaseUBAgent):
                 "- If they want a senior call directly, call setup_senior_call.\n"
                 "- If hesitant, call handle_hesitation.\n"
                 "- If not interested, call not_interested.\n"
+                "- If busy (busy, baad me, class chal rahi), call person_busy.\n"
                 "- If they ask 'where did you get my number' or 'are you AI', "
                 "call handle_objection.\n"
                 "Do NOT speak — only call tools."
@@ -447,6 +582,13 @@ class Step6_OfferSample(BaseUBAgent):
         await self.say_script(S_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent
         return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> "BaseUBAgent":
+        """Person is busy right now."""
+        await self.say_script(S_BUSY)
+        from agents.shared.scheduler import SchedulerAgent
+        return SchedulerAgent()
 
     @function_tool
     async def send_whatsapp_sample(self, context: RunCtx, response: str = "yes") -> "BaseUBAgent":
