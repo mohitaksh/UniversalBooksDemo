@@ -1,4 +1,4 @@
-﻿"""
+"""
 VISIT FOLLOW-UP — Teacher who was visited in person
 ════════════════════════════════════════════════════
 
@@ -9,12 +9,19 @@ Step 4: Share relevant USP (AI-generated from KB)
 Step 5: Next steps
 
 EDIT YOUR SCRIPTS below.
+
+LEARNINGS APPLIED (see learnings.md):
+  - @function_tool without parentheses
+  - All tools have ≥1 parameter (for Groq schema compat)
+  - Return Agent instance (not tuple)
+  - asyncio.sleep(5.0) in first agent for SIP audio delay
 """
 
+import asyncio
 import logging
 from livekit.agents import function_tool
 from agents.base_agent import BaseUBAgent, RunCtx
-from models import CallUserData
+from agents.shared.objection_handler import ObjectionAgent, S_NUMBER_SOURCE, S_AI_RESPONSE
 from knowledgebase import kb_to_prompt
 
 logger = logging.getLogger("flow.visit_followup")
@@ -65,29 +72,47 @@ class Step1_Greet(BaseUBAgent):
 
     def __init__(self, **kwargs):
         super().__init__(
-            instructions="Greeting. If confirmed call identity_confirmed, if wrong call wrong_person, if busy call person_busy. Do NOT speak.",
+            instructions=(
+                "You greeted the teacher. Listen for confirmation.\n"
+                "- If confirmed, call identity_confirmed.\n"
+                "- If wrong, call wrong_person.\n"
+                "- If busy, call person_busy.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
+                "Do NOT speak."
+            ),
             **kwargs,
         )
 
     async def on_enter(self) -> None:
+        await asyncio.sleep(5.0)
         await self.say_script(S1_GREETING)
 
     @function_tool
-    async def identity_confirmed(self, context: RunCtx, response: str = "ok"):
+    async def identity_confirmed(self, context: RunCtx, response: str = "ok") -> "Step2_Recall":
         """Confirmed."""
-        return Step2_Recall(chat_ctx=self.chat_ctx), "Confirmed"
+        return Step2_Recall()
 
     @function_tool
-    async def wrong_person(self, context: RunCtx, response: str = "ok"):
+    async def wrong_person(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Wrong."""
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Wrong Contact", chat_ctx=self.chat_ctx), "Wrong"
+        return CloserAgent(tag="Wrong Contact")
 
     @function_tool
-    async def person_busy(self, context: RunCtx, response: str = "ok"):
+    async def person_busy(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Busy."""
         from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent(chat_ctx=self.chat_ctx), "Busy"
+        return SchedulerAgent()
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Objection raised."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_Recall())
 
 
 class Step2_Recall(BaseUBAgent):
@@ -100,6 +125,8 @@ class Step2_Recall(BaseUBAgent):
                 "- If they share positive feedback or ask for more, call feedback_positive.\n"
                 "- If hesitant, call hesitant.\n"
                 "- If not interested, call not_interested.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak."
             ),
             **kwargs,
@@ -110,24 +137,32 @@ class Step2_Recall(BaseUBAgent):
         await self.say_script(S3_ASK_FEEDBACK)
 
     @function_tool
-    async def feedback_positive(self, context: RunCtx, response: str = "ok"):
+    async def feedback_positive(self, context: RunCtx, response: str = "ok") -> "Step4_ShareUSP":
         """Positive feedback or wants more product info."""
-        # Use AI to share relevant USP based on what they teach
-        return Step4_ShareUSP(chat_ctx=self.chat_ctx), "Positive feedback"
+        return Step4_ShareUSP()
 
     @function_tool
-    async def hesitant(self, context: RunCtx, response: str = "ok"):
+    async def hesitant(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Hesitant."""
         await self.say_script(S5_HESITANT)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "Hesitant"
+        return CloserAgent(tag="Call Back")
 
     @function_tool
-    async def not_interested(self, context: RunCtx, response: str = "ok"):
+    async def not_interested(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Not interested."""
         await self.say_script(S5_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Not Interested", chat_ctx=self.chat_ctx), "Not interested"
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Objection raised."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_Recall())
 
 
 class Step4_ShareUSP(BaseUBAgent):
@@ -146,25 +181,34 @@ class Step4_ShareUSP(BaseUBAgent):
         )
 
     async def on_enter(self) -> None:
-        await self.session.generate_reply()
+        self.session.generate_reply()
 
     @function_tool
-    async def interested(self, context: RunCtx, response: str = "ok"):
+    async def interested(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Wants senior call."""
         await self.say_script(S5_INTERESTED)
         from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent(chat_ctx=self.chat_ctx), "Interested"
+        return SchedulerAgent()
 
     @function_tool
-    async def hesitant(self, context: RunCtx, response: str = "ok"):
+    async def hesitant(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Hesitant."""
         await self.say_script(S5_HESITANT)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "Hesitant"
+        return CloserAgent(tag="Call Back")
 
     @function_tool
-    async def not_interested(self, context: RunCtx, response: str = "ok"):
+    async def not_interested(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Not interested."""
         await self.say_script(S5_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Not Interested", chat_ctx=self.chat_ctx), "Not interested"
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Objection raised."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step4_ShareUSP())

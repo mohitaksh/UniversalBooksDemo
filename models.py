@@ -90,7 +90,7 @@ def get_random_voice() -> VoiceProfile:
 class CallUserData:
     """Shared state across all agents in a single call session."""
     # Caller identity
-    caller_name: str = "ji"
+    caller_name: str = "Prakash"
     phone_number: str = ""
     call_type: CallType = CallType.NEW_TEACHER_COACHING
 
@@ -134,7 +134,7 @@ class CallUserData:
 # ═══════════════════════════════════════════════════════════════
 
 # Prices (adjust if needed)
-USD_TO_INR               = 92.0
+USD_TO_INR               = 95.0
 PRICE_TTS_PER_10K_CHARS  = 30.0   # INR
 PRICE_STT_PER_MIN        = 0.50   # INR
 PRICE_LLM_INPUT_PER_1M   = 3.00   # USD (Groq approx)

@@ -30,6 +30,7 @@ from livekit.agents import function_tool
 from agents.base_agent import BaseUBAgent, RunCtx
 from models import CallUserData
 from knowledgebase import kb_to_prompt
+from agents.shared.objection_handler import ObjectionAgent, S_NUMBER_SOURCE, S_AI_RESPONSE
 
 logger = logging.getLogger("flow.new_teacher")
 
@@ -39,11 +40,11 @@ logger = logging.getLogger("flow.new_teacher")
 # ═══════════════════════════════════════════════════════════════
 
 S1_GREETING = (
-    "Hello, क्या मेरी बात {caller_name} से हो रही है?"
+    "Hello, क्या मेरी बात {caller_name} से हो रही है जो tuition पढ़ाते हैं?"
 )
 
 S1_WRONG_PERSON = (
-    "Oh sorry sir, wrong number ho gaya. Aapko disturb karne ke liye maafi {chahta} hूँ।"
+    "Sorry sir, Aapko disturb karne ke liye maafi {chahta} hूँ।"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -118,26 +119,26 @@ S_BUSY = (
 # ═══════════════════════════════════════════════════════════════
 
 EXAM_TO_KB = {
-    "neet":         ["neet_jee"],
-    "jee":          ["neet_jee"],
-    "j double e":   ["neet_jee"],
-    "medical":      ["neet_jee"],
-    "engineering":  ["neet_jee"],
-    "jee advanced": ["jee_advanced"],
-    "boards":       ["class_11", "class_12"],
-    "cbse":         ["class_11", "class_12"],
-    "12":           ["class_12"],
-    "11":           ["class_11"],
-    "10":           ["class_10"],
-    "9":            ["class_9"],
-    "8":            ["class_8"],
-    "7":            ["class_7"],
-    "6":            ["class_6"],
+    "neet":         ["neet_jee", "neet_pyq", "dpp_neet"],
+    "jee":          ["neet_jee", "jee_pyq", "dpp_jee"],
+    "j double e":   ["neet_jee", "jee_pyq", "dpp_jee"],
+    "medical":      ["neet_jee", "neet_pyq"],
+    "engineering":  ["neet_jee", "jee_pyq"],
+    "jee advanced": ["jee_advanced", "jee_pyq"],
+    "boards":       ["class_11", "class_12", "cbse_12_pyq", "worksheets"],
+    "cbse":         ["class_11", "class_12", "cbse_12_pyq", "worksheets"],
+    "12":           ["class_12", "cbse_12_pyq", "worksheets"],
+    "11":           ["class_11", "worksheets"],
+    "10":           ["class_10", "cbse_10_pyq", "worksheets"],
+    "9":            ["class_9", "worksheets"],
+    "8":            ["class_8", "worksheets"],
+    "7":            ["class_7", "worksheets"],
+    "6":            ["class_6", "worksheets"],
     "kcet":         ["kcet"],
     "mhtcet":       ["mhtcet"],
     "eapcet":       ["eapcet"],
     "cuet":         ["cuet"],
-    "foundation":   ["class_9", "class_10"],
+    "foundation":   ["class_9", "class_10", "worksheets", "cbse_10_pyq"],
 }
 
 
@@ -169,6 +170,8 @@ class Step1_Greet(BaseUBAgent):
                 "call identity_confirmed.\n"
                 "- If wrong person, call wrong_person.\n"
                 "- If they're busy, call person_busy.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak — only call tools."
             ),
             **kwargs,
@@ -199,6 +202,15 @@ class Step1_Greet(BaseUBAgent):
         from agents.shared.scheduler import SchedulerAgent
         return SchedulerAgent()
 
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Person raised an objection (where got number, are you AI, busy/in class)."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_Intro())
+
 
 # ═══════════════════════════════════════════════════════════════
 # STEP 2: COMPANY INTRO
@@ -215,6 +227,8 @@ class Step2_Intro(BaseUBAgent):
                 "call permission_granted.\n"
                 "- If they say not interested or don't call, call not_interested.\n"
                 "- If busy, call person_busy.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak — only call tools."
             ),
             **kwargs,
@@ -242,6 +256,15 @@ class Step2_Intro(BaseUBAgent):
         from agents.shared.scheduler import SchedulerAgent
         return SchedulerAgent()
 
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Person raised an objection."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step3_AskClasses())
+
 
 # ═══════════════════════════════════════════════════════════════
 # STEP 3: ASK ABOUT CLASSES / EXAMS
@@ -257,6 +280,8 @@ class Step3_AskClasses(BaseUBAgent):
                 "Listen for their answer. When they tell you "
                 "(e.g. 'NEET', '9th to 12th', 'JEE and Boards'), "
                 "call classes_shared with the info.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak — only call tools."
             ),
             **kwargs,
@@ -280,6 +305,15 @@ class Step3_AskClasses(BaseUBAgent):
 
         kb_modules = resolve_kb_modules(classes_and_exams)
         return Step4_ShareProduct(kb_modules=kb_modules)
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Person raised an objection."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step3_AskClasses())
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -305,10 +339,14 @@ class Step4_ShareProduct(BaseUBAgent):
                 "offers for their classes NATURALLY in Hinglish. "
                 "Be specific — mention subject names, number of questions, unique features. "
                 "Mention that books pe unke institute ki branding lagti hai free of cost. "
+                "IMPORTANT: If worksheet data is present, only mention worksheets for the "
+                "classes the teacher actually teaches, NOT all available classes. "
                 "Keep it conversational, 3-4 sentences max.\n"
                 "After the person responds, if they want to see samples or know more, "
                 "call offer_sample. If they raise concerns, call handle_hesitation. "
-                "If not interested at all, call not_interested.\n\n"
+                "If not interested at all, call not_interested.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n\n"
                 f"PRODUCT DATA:\n{kb_context}"
             ),
             **kwargs,
@@ -337,6 +375,15 @@ class Step4_ShareProduct(BaseUBAgent):
         from agents.shared.closer import CloserAgent
         return CloserAgent(tag="Not Interested")
 
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Person raised an objection."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step4_ShareProduct(kb_modules=self._kb_modules))
+
 
 # ═══════════════════════════════════════════════════════════════
 # STEP 6: OFFER SAMPLE
@@ -348,11 +395,13 @@ class Step6_OfferSample(BaseUBAgent):
     def __init__(self, **kwargs):
         super().__init__(
             instructions=(
-                "You offered sample material and asked if they want a senior call. "
-                "Listen for their response.\n"
-                "- If yes or interested, call setup_senior_call.\n"
+                "You offered sample material. Listen for their response.\n"
+                "- If yes or interested in seeing samples, call send_whatsapp_sample.\n"
+                "- If they want a senior call directly, call setup_senior_call.\n"
                 "- If hesitant, call handle_hesitation.\n"
                 "- If not interested, call not_interested.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak — only call tools."
             ),
             **kwargs,
@@ -380,3 +429,18 @@ class Step6_OfferSample(BaseUBAgent):
         await self.say_script(S_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent
         return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def send_whatsapp_sample(self, context: RunCtx, response: str = "yes") -> "BaseUBAgent":
+        """Person wants to see samples on WhatsApp."""
+        from agents.shared.sample_sender import SampleSenderAgent
+        return SampleSenderAgent()
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Person raised an objection."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step6_OfferSample())

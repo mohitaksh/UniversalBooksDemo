@@ -1,4 +1,4 @@
-﻿"""
+"""
 DIGITAL SAMPLE FOLLOW-UP #2 — Second follow-up after digital sample
 ════════════════════════════════════════════════════════════════════
 
@@ -10,12 +10,19 @@ Step 5: If YES → Collect address / If NO → Close
 Step 6: Good Wishes
 
 EDIT YOUR SCRIPTS below.
+
+LEARNINGS APPLIED (see learnings.md):
+  - @function_tool without parentheses
+  - All tools have ≥1 parameter (for Groq schema compat)
+  - Return Agent instance (not tuple)
+  - asyncio.sleep(5.0) in first agent for SIP audio delay
 """
 
+import asyncio
 import logging
 from livekit.agents import function_tool
 from agents.base_agent import BaseUBAgent, RunCtx
-from models import CallUserData
+from agents.shared.objection_handler import ObjectionAgent, S_NUMBER_SOURCE, S_AI_RESPONSE
 
 logger = logging.getLogger("flow.digital_sample_2")
 
@@ -80,30 +87,42 @@ class Step1_Greet(BaseUBAgent):
                 "- If confirmed, call identity_confirmed.\n"
                 "- If wrong person, call wrong_person.\n"
                 "- If busy, call person_busy.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak."
             ),
             **kwargs,
         )
 
     async def on_enter(self) -> None:
+        await asyncio.sleep(5.0)
         await self.say_script(S1_GREETING)
 
     @function_tool
-    async def identity_confirmed(self, context: RunCtx, response: str = "ok"):
+    async def identity_confirmed(self, context: RunCtx, response: str = "ok") -> "Step2_Recall":
         """Confirmed."""
-        return Step2_Recall(chat_ctx=self.chat_ctx), "Confirmed"
+        return Step2_Recall()
 
     @function_tool
-    async def wrong_person(self, context: RunCtx, response: str = "ok"):
+    async def wrong_person(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Wrong person."""
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Wrong Contact", chat_ctx=self.chat_ctx), "Wrong"
+        return CloserAgent(tag="Wrong Contact")
 
     @function_tool
-    async def person_busy(self, context: RunCtx, response: str = "ok"):
+    async def person_busy(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Busy."""
         from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent(chat_ctx=self.chat_ctx), "Busy"
+        return SchedulerAgent()
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Objection raised."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_Recall())
 
 
 class Step2_Recall(BaseUBAgent):
@@ -115,6 +134,8 @@ class Step2_Recall(BaseUBAgent):
                 "You asked if they checked the content. Listen.\n"
                 "- If SEEN and sharing feedback, call sample_seen.\n"
                 "- If NOT SEEN, call sample_not_seen.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak."
             ),
             **kwargs,
@@ -124,18 +145,27 @@ class Step2_Recall(BaseUBAgent):
         await self.say_script(S2_RECALL)
 
     @function_tool
-    async def sample_seen(self, context: RunCtx, response: str = "ok"):
+    async def sample_seen(self, context: RunCtx, response: str = "ok") -> "Step4_PhysicalOffer":
         """Has seen the sample."""
         await self.say_script(S4_FEEDBACK_ACK)
-        return Step4_PhysicalOffer(chat_ctx=self.chat_ctx), "Feedback received"
+        return Step4_PhysicalOffer()
 
     @function_tool
-    async def sample_not_seen(self, context: RunCtx, response: str = "ok"):
+    async def sample_not_seen(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Has NOT seen."""
         await self.say_script(S3_NOT_SEEN)
         await self.say_script(S3_INCENTIVE)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", notes="Reshared + sent free test papers", chat_ctx=self.chat_ctx), "Reshared"
+        return CloserAgent(tag="Call Back", notes="Reshared + sent free test papers")
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Objection raised."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_Recall())
 
 
 class Step4_PhysicalOffer(BaseUBAgent):
@@ -153,17 +183,17 @@ class Step4_PhysicalOffer(BaseUBAgent):
         )
 
     @function_tool
-    async def collect_address(self, context: RunCtx, response: str = "ok"):
+    async def collect_address(self, context: RunCtx, response: str = "ok") -> "Step5_AddressCollection":
         """Person wants physical sample. Collect address."""
         await self.say_script(S5_COLLECT_ADDRESS)
-        return Step5_AddressCollection(chat_ctx=self.chat_ctx), "Collecting address"
+        return Step5_AddressCollection()
 
     @function_tool
-    async def no_physical(self, context: RunCtx, response: str = "ok"):
+    async def no_physical(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Person doesn't want physical sample."""
         await self.say_script(S5_NO_PHYSICAL)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "No physical"
+        return CloserAgent(tag="Call Back")
 
 
 class Step5_AddressCollection(BaseUBAgent):
@@ -185,7 +215,7 @@ class Step5_AddressCollection(BaseUBAgent):
         self,
         context: RunCtx,
         full_address: str,
-    ):
+    ) -> "BaseUBAgent":
         """Captured the full address for physical sample delivery."""
         ud = context.userdata
         ud.lead_notes = f"Address: {full_address}"
@@ -195,4 +225,4 @@ class Step5_AddressCollection(BaseUBAgent):
 
         await self.say_script(S5_ADDRESS_CONFIRMED)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Interested", notes=f"Physical sample → {full_address}", chat_ctx=self.chat_ctx), "Address collected"
+        return CloserAgent(tag="Interested", notes=f"Physical sample → {full_address}")

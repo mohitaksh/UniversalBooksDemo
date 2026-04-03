@@ -1,20 +1,29 @@
-﻿"""
+"""
 PHYSICAL SAMPLE FOLLOW-UP — Teacher who received physical sample
 ═════════════════════════════════════════════════════════════════
 
 Step 1: Greetings — Confirm name
 Step 2: Recall — Ask if received physical sample books
-Step 3: IF NOT RECEIVED → Create task to check delivery, reshare digital
+Step 3: IF NOT RECEIVED → Fire N8N delivery check webhook + reshare digital
 Step 5: IF RECEIVED → Ask feedback on content & paper quality
 Step 6: Next steps (interested / hesitant / not interested)
 
 EDIT YOUR SCRIPTS below.
+
+LEARNINGS APPLIED (see learnings.md):
+  - @function_tool without parentheses
+  - All tools have ≥1 parameter (for Groq schema compat)
+  - Return Agent instance (not tuple)
+  - asyncio.sleep(5.0) in first agent for SIP audio delay
 """
 
+import asyncio
 import logging
+import httpx
 from livekit.agents import function_tool
 from agents.base_agent import BaseUBAgent, RunCtx
-from models import CallUserData
+from agents.shared.objection_handler import ObjectionAgent, S_NUMBER_SOURCE, S_AI_RESPONSE
+from config import N8N_DELIVERY_CHECK_WEBHOOK_URL
 
 logger = logging.getLogger("flow.physical_sample")
 
@@ -78,30 +87,42 @@ class Step1_Greet(BaseUBAgent):
                 "- If confirmed, call identity_confirmed.\n"
                 "- If wrong person, call wrong_person.\n"
                 "- If busy, call person_busy.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak."
             ),
             **kwargs,
         )
 
     async def on_enter(self) -> None:
+        await asyncio.sleep(5.0)
         await self.say_script(S1_GREETING)
 
     @function_tool
-    async def identity_confirmed(self, context: RunCtx, response: str = "ok"):
+    async def identity_confirmed(self, context: RunCtx, response: str = "ok") -> "Step2_Recall":
         """Confirmed."""
-        return Step2_Recall(chat_ctx=self.chat_ctx), "Confirmed"
+        return Step2_Recall()
 
     @function_tool
-    async def wrong_person(self, context: RunCtx, response: str = "ok"):
+    async def wrong_person(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Wrong person."""
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Wrong Contact", chat_ctx=self.chat_ctx), "Wrong"
+        return CloserAgent(tag="Wrong Contact")
 
     @function_tool
-    async def person_busy(self, context: RunCtx, response: str = "ok"):
+    async def person_busy(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Busy."""
         from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent(chat_ctx=self.chat_ctx), "Busy"
+        return SchedulerAgent()
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Objection raised."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_Recall())
 
 
 class Step2_Recall(BaseUBAgent):
@@ -113,6 +134,8 @@ class Step2_Recall(BaseUBAgent):
                 "You asked if they received the physical sample books.\n"
                 "- If YES received, call sample_received.\n"
                 "- If NOT received, call sample_not_received.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak."
             ),
             **kwargs,
@@ -122,21 +145,44 @@ class Step2_Recall(BaseUBAgent):
         await self.say_script(S2_RECALL)
 
     @function_tool
-    async def sample_received(self, context: RunCtx, response: str = "ok"):
+    async def sample_received(self, context: RunCtx, response: str = "ok") -> "Step5_Feedback":
         """Person received the physical sample."""
-        return Step5_Feedback(chat_ctx=self.chat_ctx), "Received"
+        return Step5_Feedback()
 
     @function_tool
-    async def sample_not_received(self, context: RunCtx, response: str = "ok"):
-        """Person did NOT receive the sample. Create task + reshare digital."""
+    async def sample_not_received(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
+        """Person did NOT receive the sample. Fire delivery check webhook."""
         ud = context.userdata
         if ud.tracker:
             ud.tracker.log_function("create_task", {"task": "check_parcel_delivery"})
 
+        # Fire N8N delivery check webhook
+        if N8N_DELIVERY_CHECK_WEBHOOK_URL:
+            try:
+                async with httpx.AsyncClient(timeout=5) as client:
+                    await client.post(N8N_DELIVERY_CHECK_WEBHOOK_URL, json={
+                        "phone": ud.phone_number,
+                        "name": ud.caller_name,
+                        "issue": "parcel_not_received",
+                        "call_type": ud.call_type.value,
+                        "call_id": ud.call_id,
+                    })
+            except Exception as e:
+                logger.warning(f"N8N delivery check webhook failed: {e}")
+
         await self.say_script(S3_NOT_RECEIVED)
         await self.say_script(S3_RESHARE_DIGITAL)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", notes="Parcel not received, reshared digital", chat_ctx=self.chat_ctx), "Not received"
+        return CloserAgent(tag="Call Back", notes="Parcel not received, reshared digital")
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Objection raised."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_Recall())
 
 
 class Step5_Feedback(BaseUBAgent):
@@ -149,6 +195,8 @@ class Step5_Feedback(BaseUBAgent):
                 "- If they ask for more (pricing, order, visit, more samples), call interested.\n"
                 "- If hesitant (dekhte hai, sochte hai), call hesitant.\n"
                 "- If not interested, call not_interested.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', "
+                "call handle_objection.\n"
                 "Do NOT speak."
             ),
             **kwargs,
@@ -158,22 +206,31 @@ class Step5_Feedback(BaseUBAgent):
         await self.say_script(S5_ASK_FEEDBACK)
 
     @function_tool
-    async def interested(self, context: RunCtx, response: str = "ok"):
-        """Wants more details, pricing, visit, or order."""
+    async def interested(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
+        """Wants more details."""
         await self.say_script(S6_INTERESTED)
         from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent(chat_ctx=self.chat_ctx), "Interested"
+        return SchedulerAgent()
 
     @function_tool
-    async def hesitant(self, context: RunCtx, response: str = "ok"):
+    async def hesitant(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Hesitant."""
         await self.say_script(S6_HESITANT)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", chat_ctx=self.chat_ctx), "Hesitant"
+        return CloserAgent(tag="Call Back")
 
     @function_tool
-    async def not_interested(self, context: RunCtx, response: str = "ok"):
+    async def not_interested(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
         """Not interested."""
         await self.say_script(S6_NOT_INTERESTED)
         from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Not Interested", chat_ctx=self.chat_ctx), "Not interested"
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
+        """Objection raised."""
+        if "number" in objection.lower() or "kahan" in objection.lower():
+            await self.say_script(S_NUMBER_SOURCE)
+        else:
+            await self.say_script(S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step5_Feedback())

@@ -23,9 +23,12 @@ GROQ_MODEL   = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
 
 # ─── N8N Webhooks ───────────────────────────────────────────
-N8N_CALLBACK_WEBHOOK_URL = os.getenv("N8N_CALLBACK_WEBHOOK_URL", "")
-N8N_TAG_LEAD_WEBHOOK_URL = os.getenv("N8N_TAG_LEAD_WEBHOOK_URL", "")
-N8N_LOG_WEBHOOK_URL      = os.getenv("N8N_LOG_WEBHOOK_URL", "")
+N8N_CALLBACK_WEBHOOK_URL         = os.getenv("N8N_CALLBACK_WEBHOOK_URL", "")
+N8N_TAG_LEAD_WEBHOOK_URL         = os.getenv("N8N_TAG_LEAD_WEBHOOK_URL", "")
+N8N_LOG_WEBHOOK_URL              = os.getenv("N8N_LOG_WEBHOOK_URL", "")
+N8N_WHATSAPP_SAMPLE_WEBHOOK_URL  = os.getenv("N8N_WHATSAPP_SAMPLE_WEBHOOK_URL", "")
+N8N_DELIVERY_CHECK_WEBHOOK_URL   = os.getenv("N8N_DELIVERY_CHECK_WEBHOOK_URL", "")
+N8N_DNC_WEBHOOK_URL              = os.getenv("N8N_DNC_WEBHOOK_URL", "")
 
 # ─── Recording ──────────────────────────────────────────────
 ENABLE_RECORDING = os.getenv("ENABLE_RECORDING", "false").lower() == "true"
