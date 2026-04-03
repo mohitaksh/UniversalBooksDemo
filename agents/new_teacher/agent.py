@@ -39,8 +39,12 @@ logger = logging.getLogger("flow.new_teacher")
 # STEP 1 — GREETING SCRIPTS
 # ═══════════════════════════════════════════════════════════════
 
-S1_GREETING = (
-    "Hello, क्या मेरी बात {caller_name} से हो रही है जो tuition पढ़ाते हैं?"
+S1_GREETING_TEACHER = (
+    "Hello, क्या मेरी बात {caller_name} से हो रही है जो coaching मे पढ़ाते हैं?"
+)
+
+S1_GREETING_INSTITUTION = (
+    "Hello, क्या ये number {caller_name} का है ?"
 )
 
 S1_WRONG_PERSON = (
@@ -52,8 +56,16 @@ S1_WRONG_PERSON = (
 # ═══════════════════════════════════════════════════════════════
 
 S2_INTRO = (
-    "जी {mera} naam {agent_name} hai, mai Universal Books se bol {bol_raha} हूँ। हम एक साठ साल पुरानी publishing company हैं। "
-    "हमारी  Errorless book आती है नीट और जे-ई-ई के लिए आपने सुना होगा, अब हम कोचिंगस के लिए study material भी बनाते है जिसपे आपकी खुद की branding लगती है और उस branding को लगाने का कोई एक्स्ट्रा चार्ज भी नहीं लगता। क्या मै आपका एक मिनट {le_sakta} हूँ?"
+    "जी {mera} naam {agent_name} hai, mai Universal Books se bol {bol_raha} हूँ।"
+    "हमारी Errorless books आती है, आपने सुना होगा, errorless physics वघेर जो नीट और जे-ई-ई के लिए बोहत famous हैं। जानते हैं आप ?"
+)
+
+S2_ASK_PERMISSION = (
+    "जी हा-हा, हम उन्ही बुक्स के पब्लिशर हैं, आपसे बस दो मिनट बात करनी थी - अभी कर {le_sakta} हूँ?"
+)
+
+S2_INTRO_MORE = (
+    "आच्छा, आप नहीं जानते तोह मै बता दु मैं Universal Books की तरफ़ से बोल {bol_raha} हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के समय से exam preparation ki books aur material बनाते आ रहे हैं। और अब हम coaching institutes और teachers के लिए भी study material बनाते हैं - जिसपे हम उनकी खुद कि branding लगा के देते हैं बिना किसी extra charges के। और best बात - हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं, और इसलिए भी हम आप लोगों से directly ही deal करते हैं। तो बस दो minute बात करेंगे आप?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -61,7 +73,7 @@ S2_INTRO = (
 # ═══════════════════════════════════════════════════════════════
 
 S3_ASK_CLASSES = (
-    "जी, मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है?"
+    "जी, पहले तो मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है? सिर्फ boards वघेरा या नीट और जे-ई-ई-भी?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -71,10 +83,22 @@ S3_ASK_CLASSES = (
 # ═══════════════════════════════════════════════════════════════
 
 S45_AI_INSTRUCTION = (
-    "Based on the product data below, share 2-3 key highlights NATURALLY "
-    "in Hinglish. Be specific — mention subject names, number of questions, "
-    "unique features. "
-    "After sharing, call offer_sample."
+    """Based on the product data below, share 2-3 key highlights NATURALLY 
+    in Hinglish. Be specific — mention subject names, number of questions, 
+    unique features. 
+    After sharing, call offer_sample.
+
+    LANGUAGE RULES (follow strictly):
+    - Respond ONLY in Devanagari Hinglish — Hindi in Devanagari script mixed with English words kept in English.
+    - Example: "जी, मैं Universal Books की तरफ़ से बोल रहा हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के दशक से teachers और coaching centers के लिए up-to-date exam preparation ki books aur material बनाते हैं."
+    - Always use "आप" (respectful). NEVER "तू" or "तुम".
+    - Speak numbers in English: 1960 → Nineteen Sixty, 5000 → Five Thousand, 350 → Three Fifty, 60 → Sixty
+    - Maximum 2-3 SHORT sentences per response. This is a voice call.
+    - One question at a time. Never stack questions.
+    - Use natural filler: "जी", "हाँ", "देखिए", "actually"
+    - Mirror the caller's energy — brief when they're rushed, slightly elaborate when they're curious.
+    - use "mai" instead of "main" to avoid confusions with english words like "main" for TTS
+    """
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -91,18 +115,19 @@ S6_OFFER_SAMPLE = (
 # ═══════════════════════════════════════════════════════════════
 
 S_HESITANT = (
-    "कोई issue nahi sir, aap ek baar content check kar le, agar aapko aur chapters bhi "
-    "chaiye toh aap mujko bata sakte hai। Humari team aapko visit bhi kar legi। "
-    "Furthermore sir, our minimum quantity is just 10 sets so you can even "
-    "get a single module to see if our branded material makes an impact।"
+    """कोई issue कि बात नहीं है , आप आराम से content check kar lijiye,
+    अगर आपको और chapters भी चाहिए तो आप मुझे बता सकते हैं ।
+
+    और बाद मे अगर ऑर्डर भी करना हो तोह हमारी मिनमम क्वानटिटी सिर्फ दस sets हैं। तो आप सिर्फ एक module मंगा के भी देख सकते हैं कि content कितना अच्छा है।
+    """
 )
 
 S_NOT_INTERESTED = (
-    "No issues sir, I understand। Please let us know if and when you change your mind"
+    "जी कोई बात नहीं। अगर कभी आपको कुछ market से अलग चाहिए हो तो हमे एक message कर दीजिएगा"
 )
 
 S_BUSY = (
-    "Koi baat nahi sir, aapko kab time milega?"
+    "कोई बात नहीं, हम आपको कब call कर सकते है? कोई टाइम बता दीजिए?"
 )
 
 
@@ -113,11 +138,11 @@ S_BUSY = (
 # ═══════════════════════════════════════════════════════════════
 
 EXAM_TO_KB = {
-    "neet":         ["neet_jee", "neet_pyq", "dpp_neet"],
-    "jee":          ["neet_jee", "jee_pyq", "dpp_jee"],
-    "j double e":   ["neet_jee", "jee_pyq", "dpp_jee"],
-    "medical":      ["neet_jee", "neet_pyq"],
-    "engineering":  ["neet_jee", "jee_pyq"],
+    "neet":         ["neet_pyq", "dpp_neet", "neet_jee"],
+    "jee":          ["jee_pyq", "dpp_jee", "neet_jee"],
+    "j double e":   ["jee_pyq", "dpp_jee", "neet_jee"],
+    "medical":      ["neet_pyq", "neet_jee"],
+    "engineering":  ["jee_pyq", "neet_jee"],
     "jee advanced": ["jee_advanced", "jee_pyq"],
     "boards":       ["class_11", "class_12", "cbse_12_pyq", "worksheets"],
     "cbse":         ["class_11", "class_12", "cbse_12_pyq", "worksheets"],
