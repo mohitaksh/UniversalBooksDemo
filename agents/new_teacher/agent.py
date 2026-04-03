@@ -78,7 +78,7 @@ YOUR IDENTITY:
 # ═══════════════════════════════════════════════════════════════
 
 S1_GREETING_TEACHER = (
-    "Hello, क्या मेरी बात {caller_name} से हो रही है जो coaching मे पढ़ाते हैं?"
+    "Hello, क्या मेरी बात {caller_name} जी से हो रही है जो coaching मे पढ़ाते हैं?"
 )
 
 S1_GREETING_INSTITUTION = (
@@ -86,7 +86,7 @@ S1_GREETING_INSTITUTION = (
 )
 
 S1_WRONG_PERSON = (
-    "Sorry sir, Aapko disturb karne ke liye maafi {chahta} हूँ।"
+    "Sorry, wrong number लगा दिया, sorry।"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -95,15 +95,15 @@ S1_WRONG_PERSON = (
 
 S2_INTRO = (
     "जी {mera} naam {agent_name} hai, mai Universal Books se bol {bol_raha} हूँ।"
-    "हमारी Errorless books आती है, आपने सुना होगा, errorless physics वघेर जो नीट और जे-ई-ई के लिए बोहत famous हैं। जानते हैं आप ?"
+    "हमारी .. Errorless के नाम se books आती हैं मार्केट मे, आपने शायद सुना होगा, जैसे - Errorless Physics जो नीट और जे-ई-ई के लिए बोहत famous हैं! .. जानते हैं आप?"
 )
 
 S2_ASK_PERMISSION = (
-    "जी हा-हा, हम उन्ही बुक्स के पब्लिशर हैं, आपसे बस दो मिनट बात करनी थी - अभी कर {le_sakta} हूँ?"
+    "जी हा-हा, हम उन्ही बुक्स के पब्लिशर हैं ... आपसे बस दो मिनट बात करनी थी ... अभी बात कर सकते हैं?"
 )
 
 S2_INTRO_MORE_THEN_ASK_PERMISSION = (
-    "आच्छा, आप नहीं जानते तोह मै बता दु मैं Universal Books की तरफ़ से बोल {bol_raha} हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के समय से exam preparation ki books aur material बनाते आ रहे हैं। और अब हम coaching institutes और teachers के लिए भी study material बनाते हैं - जिसपे हम उनकी खुद कि branding लगा के देते हैं बिना किसी extra charges के। और best बात - हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं, और इसलिए भी हम आप लोगों से directly ही deal करते हैं। तो बस दो minute बात करेंगे आप?"
+    "आच्छा, आप नहीं जानते तोह मै बताना चाहूंगी कि मैं Universal Books की तरफ़ से बोल रही हूँ। हम 60 सालो से, मतलब की Nineteen Sixty के समय से exam preparation ki books aur material बनाते आ रहे हैं। और अब हम class sixth se twelfth tak ke liye CBSE boards ki books और Neet, जे ई ई और बाकी medical और engineering exams के लिए, Exam Preparation material बनाते हैं ... जिसपे हम आपकी coaching कि खुद कि branding लगा के देते हैं, बिना किसी extra charges के। और best बात यह है कि हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं, और इस वजह से भी हम आप लोगों से directly ही बात करते हैं ... तो क्या आप बस दो minute बात कर सकते हैं?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -111,7 +111,7 @@ S2_INTRO_MORE_THEN_ASK_PERMISSION = (
 # ═══════════════════════════════════════════════════════════════
 
 S3_ASK_CLASSES = (
-    "जी, पहले तो मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है? सिर्फ boards वघेरा या नीट और जे-ई-ई-भी?"
+    "जी, पहले तो मै जानना {chahta} हूँ कि आपके यहा कौन सी classes और exams की पढ़ाई कराई जाती है? सिर्फ boards की .. या नीट और जे-ई-ई-भी?"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -123,7 +123,7 @@ S3_ASK_CLASSES = (
 S45_AI_INSTRUCTION = (
     """Based on the product data below, share 2-3 key highlights NATURALLY 
     in Hinglish. Be specific — mention subject names, number of questions, 
-    unique features. 
+    unique features. Use the provided scripts to answer.
     After sharing, call offer_sample.
     """
 )
@@ -503,7 +503,7 @@ class Step4_ShareProduct(BaseUBAgent):
                 "IMPORTANT: If worksheet data is present, only mention worksheets for the "
                 "classes the teacher actually teaches, NOT all available classes. "
                 "Keep it conversational, 2-3 sentences max.\n\n"
-                "If there are SAMPLE SCRIPTS in the product data, USE THEM as reference "
+                "If there are SAMPLE SCRIPTS in the product data, USE THEM"
                 "for how to phrase things. You can adapt them but keep the natural tone.\n\n"
                 "After the person responds positively (ठीक है, ओके, हाँ, अच्छा): "
                 "if they want to see samples or know more, call offer_sample. "

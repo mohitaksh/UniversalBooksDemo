@@ -26,9 +26,8 @@ logger = logging.getLogger("agents.closer")
 # ═══════════════════════════════════════════════════════════════
 
 CLOSING_GOOD_WISHES = (
-    "Thank you for your time sir, our content has empowered 1 Lakh+ institutes "
-    "with better results and admissions and we are always here to keep working "
-    "towards helping you teach better. Have a great day sir!"
+    "Thank you for your time, "
+    "We look forwards towards helping you teach better. Have a great day sir!"
 )
 
 # ═══════════════════════════════════════════════════════════════
