@@ -95,7 +95,7 @@ S1_WRONG_PERSON = (
 
 S2_INTRO = (
     "जी {mera} naam {agent_name} है, मै  Universal Books से बोल {bol_raha} हूँ।"
-    "हमारी .. Errorless के नाम se books आती हैं मार्केट मे, आपने शायद सुना होगा, जैसे जो नीट और जे-ई-ई exams के लिए बोहत famous हैं! .. जानते हैं आप?"
+    "हमारी .. Errorless के नाम se books आती हैं मार्केट मे, आपने शायद सुना होगा, जैसे जो नीट और जे-ई-ई exams के लिए बोहत famous हैं! Errorless Physics वघेरा  .. जानते हैं आप?"
 )
 
 S2_ASK_PERMISSION = (
