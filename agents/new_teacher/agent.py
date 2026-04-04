@@ -133,7 +133,7 @@ S45_AI_INSTRUCTION = (
 # ═══════════════════════════════════════════════════════════════
 
 S6_OFFER_SAMPLE = (
-    "Okay तोह मैंने आपको WhatsApp पर sample share कर दिया है, और अगर आपको physical book भी देखनी है, तो वोह भी हम अरैन्ज कर देंगे।"
+    "Okay तोह मैंने आपको WhatsApp पर sample share कर दिया है, और अगर आपको physical book भी देखनी है, तो वोह भी हम arrange कर देंगे।"
     "आप आराम से sample देख लीजिए, मुझे यकीन है आपको कुछ Market से अलग ही लगेगा। हम आपको बाद मे call कर के और भी details share कर देंगे"
 )
 
@@ -142,7 +142,7 @@ S6_OFFER_SAMPLE = (
 # ═══════════════════════════════════════════════════════════════
 
 S_HESITANT = (
-    """कोई issue कि बात नहीं है , हम आपको Samples WhatsApp par bhej देते हैं, आप आराम से content check kar lijiye,
+    """कोई issue कि बात नहीं है , हम आपको Samples WhatsApp पर bhej देते हैं, आप आराम से content check kar lijiye,
     हम आपको physical book भी arrange कर देंगे। हमारी team आपको call कर के और भी details share कर देगी।
     और बाद मे अगर ऑर्डर भी करना हो तोह हमारी मिनमम क्वानटिटी सिर्फ दस sets हैं। तो आप सिर्फ एक module मंगा के भी देख सकते हैं कि content कितना अच्छा है।
     """
@@ -206,29 +206,22 @@ def resolve_kb_modules(classes_text: str) -> list[str]:
 # ═══════════════════════════════════════════════════════════════
 
 class Step1_Greet(BaseUBAgent):
-    """Step 1a: Wait silently for the caller to pick up and speak first.
-    
-    When the phone rings, the SIP participant joins the room immediately
-    but the human hasn't answered yet. We wait for ANY speech from the
-    user before firing the greeting. This saves TTS/LLM costs on
-    unanswered calls.
-    """
+    """Step 1a: Proactively say Hello."""
 
     def __init__(self, **kwargs):
         super().__init__(
             instructions=(
-                "The phone is ringing. You are WAITING for the person to pick up.\n"
-                "Do NOT speak until the person says something.\n"
-                "When the person says ANYTHING (hello, haan, ji, boliye, ha, "
-                "kya hai, kaun, etc.), call `caller_picked_up` immediately.\n"
-                "Do NOT generate any speech. ONLY call the tool."
+                "You just said 'Hello?'. Listen carefully for the person to speak.\n"
+                "When the person replies (hello, haan, ji, boliye, ha, "
+                "kya hai, kaun, etc.), call `caller_picked_up` IMMEDIATELY.\n"
+                "Do NOT generate any additional speech. ONLY call the tool."
             ),
             **kwargs,
         )
 
     async def on_enter(self) -> None:
-        # Don't speak — just wait for user's first utterance
-        logger.info("Step1_Greet | Waiting for caller to pick up...")
+        logger.info("Step1_Greet | Saying hello...")
+        await self.say_script("Hello?")
 
     @function_tool
     async def caller_picked_up(self, context: RunCtx, response: str = "hello") -> "Step1b_ConfirmIdentity":

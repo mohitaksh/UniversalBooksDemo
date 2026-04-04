@@ -1,141 +1,143 @@
-"""
-DIGITAL SAMPLE FOLLOW-UP — Teacher who received digital sample
-═══════════════════════════════════════════════════════════════
-
-6-step flow for following up after sharing digital sample.
-
-Step 1: Greetings — Confirm name, share company name
-Step 2: Recall — Reference past conversation & sample shared
-Step 3: Follow up — Ask if they checked the files
-Step 4: If NOT SEEN → Reshare / If SEEN → Take feedback
-Step 5: Next steps (interested / hesitant / not interested)
-Step 6: Good Wishes
-
-EDIT YOUR SCRIPTS: Modify the constants below each ═══ header.
-
-LEARNINGS APPLIED (see learnings.md):
-  - @function_tool without parentheses
-  - All tools have ≥1 parameter (for Groq schema compat)
-  - Return Agent instance (not tuple)
-  - asyncio.sleep(5.0) in first agent for SIP audio delay
-"""
-
-import asyncio
 import logging
+import asyncio
+import httpx
 from livekit.agents import function_tool
 from agents.base_agent import BaseUBAgent, RunCtx
-from agents.shared.objection_handler import ObjectionAgent, S_NUMBER_SOURCE, S_AI_RESPONSE
+from agents.shared.closer import CloserAgent
+from agents.shared.scheduler import SchedulerAgent
+from config import N8N_WHATSAPP_SAMPLE_WEBHOOK_URL
 
-logger = logging.getLogger("flow.digital_sample")
-
-
-# ═══════════════════════════════════════════════════════════════
-# STEP 1 — GREETING
-# ═══════════════════════════════════════════════════════════════
-
-S1_GREETING = (
-    "Hello, kya meri baat {caller_name} se ho rahi hai? "
-    "Mai {agent_name} bol {bol_raha} हूँ, Universal Books se। How are you sir?"
-)
+logger = logging.getLogger("agents.digital_sample")
 
 # ═══════════════════════════════════════════════════════════════
-# STEP 2 — RECALL PAST CONVERSATION
+# SCRIPT STRINGS (DEVNAGARI HYBRID)
 # ═══════════════════════════════════════════════════════════════
+
+S1_GREETING = "Hello, क्या मेरी बात {caller_name} sir से हो रही है? Sir मेरा नाम {agent_name} है, Universal Books से। How are you sir?"
 
 S2_RECALL = (
-    "Sir humne pichli baar baat ki thi aur maine aapko humare "
-    "products ka digital sample share kiya tha WhatsApp par।"
+    "Sir हमने पिछली बार बात की थी, और मैंने आपको हमारे products का digital sample "
+    "WhatsApp पर share किया था।"
 )
-
-# ═══════════════════════════════════════════════════════════════
-# STEP 3 — FOLLOW UP
-# ═══════════════════════════════════════════════════════════════
-
-S3_FOLLOWUP = (
-    "Sir, aapne files dekhi? Kaisa laga aapko humara content?"
-)
-
-# ═══════════════════════════════════════════════════════════════
-# STEP 4 — BRANCHES
-# ═══════════════════════════════════════════════════════════════
+S3_FOLLOW_UP = "Sir क्या आपने files देखीं? कैसा लगा आपको हमारा content?"
 
 S4_NOT_SEEN = (
-    "No issues sir, mai files dobara send kar {kar_deta} हूँ aapko। "
-    "Please aap usko check kare aur humko bataiye kaisa laga।"
+    "No issues sir, मै आपको files दोबारा resend कर रही हूँ। "
+    "Please आप उसको check करें और हमें बताएं कैसा लगा।"
 )
 
-S4_FEEDBACK_ACK = (
-    "Thank you sir, aap jaise teachers ke feedback ke basis par hi "
-    "hum apna material design aur improve karte hai। "
-    "Maine apni senior team ko bhi yeh feedback share kar diya hai।"
+S4_SEEN_ASK = "Okay sir, आपका क्या feedback है? आपको content कैसा लगा?"
+S4_SEEN_THANK = (
+    "Thank you, आप जैसे teachers के feedback के basis पर ही हम अपना material "
+    "design और improve करते हैं। मैंने अपनी senior team को भी यह feedback share कर दिया है।"
 )
 
-# ═══════════════════════════════════════════════════════════════
-# STEP 5 — NEXT STEPS
-# ═══════════════════════════════════════════════════════════════
-
-S5_INTERESTED = (
-    "Sir humare products ke aur details ke liye maine apne senior ko "
-    "inform kar diya hai, he will call you within the next 1 hour।"
+S5_POSITIVE = (
+    "Sir हमारे products की और details के लिए मैंने अपने senior को inform कर दिया है। "
+    "He will call you within the next 1 hour."
 )
-
 S5_HESITANT = (
-    "No issues sir, aap ek baar content check kar le, agar aapko "
-    "aur chapters bhi chaiye toh aap mujko bata sakte hai। "
-    "Humari team aapko visit bhi kar legi। "
-    "Furthermore sir, our minimum quantity is just 10 sets so you can even "
-    "get a single module to see if our branded material makes an impact।"
+    "No issues sir, आप एक बार content check करलें, अगर आपको और chapter भी चाहिए तोह आप मुझको बता सकते हैं। "
+    "हमारी team आपको visit भी करलेगी। Furthermore sir, our minimum quantity is just 10 sets "
+    "so you can even get single module to see if our branded material makes an impact."
 )
 
-S5_NOT_INTERESTED = (
-    "No issues sir, I understand। Please let us know if and when you change your mind।"
-)
+S_NOT_INTERESTED = "No issues sir, I understand. Please let us know if and when you change your mind. Have a great day!"
+S_BUSY = "कोई बात नहीं, हम आपको कब call कर सकते है? कोई टाइम बता दीजिए?"
+S_NUMBER_SOURCE = "Sir आपका number हमारी team ने digital sources से लिया था, schools और institutes के database से।"
+S_AI_RESPONSE = "जी मै Universal Books की AI assistant हूँ।"
+
 
 # ═══════════════════════════════════════════════════════════════
+# COMMON OBJECTION AGENT
+# ═══════════════════════════════════════════════════════════════
 
-
-class Step1_Greet(BaseUBAgent):
-    """Step 1: Greeting — confirm identity."""
-
-    def __init__(self, **kwargs):
+class ObjectionAgent(BaseUBAgent):
+    """Handles an objection, then tries to route back to the original step."""
+    def __init__(self, return_agent: BaseUBAgent, **kwargs):
+        self.return_agent = return_agent
         super().__init__(
             instructions=(
-                "You are following up with a teacher who received a digital sample. "
-                "You just greeted them. Listen for confirmation.\n"
-                "- If confirmed, call identity_confirmed.\n"
-                "- If wrong person, call wrong_person.\n"
-                "- If busy, call person_busy.\n"
-                "- If they ask 'where did you get my number' or 'are you AI', "
-                "call handle_objection.\n"
+                "You just answered an objection (e.g. where did you get my number / are you AI). "
+                "Now smoothly transition back by calling `continue_conversation`. "
                 "Do NOT speak."
             ),
             **kwargs,
         )
 
     async def on_enter(self) -> None:
-        await asyncio.sleep(5.0)
+        pass
+
+    @function_tool
+    async def continue_conversation(self, context: RunCtx, thought: str = "returning") -> BaseUBAgent:
+        return self.return_agent
+
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 1: GREETING & CONFIRMATION
+# ═══════════════════════════════════════════════════════════════
+
+class Step1_Greet(BaseUBAgent):
+    """Step 1a: Wait for the caller to pick up natively."""
+    def __init__(self, **kwargs):
+        super().__init__(
+            instructions=(
+                "You just said 'Hello?'. Listen carefully for the person to speak.\n"
+                "When the person replies (hello, haan, ji, boliye, ha, etc.), "
+                "call `caller_picked_up` IMMEDIATELY.\n"
+                "Do NOT generate any additional speech. ONLY call the tool."
+            ),
+            **kwargs,
+        )
+
+    async def on_enter(self) -> None:
+        logger.info("digital_sample | Step1_Greet | Saying hello...")
+        await self.say_script("Hello?")
+
+    @function_tool
+    async def caller_picked_up(self, context: RunCtx, response: str = "hello") -> "Step1b_ConfirmIdentity":
+        return Step1b_ConfirmIdentity()
+
+
+class Step1b_ConfirmIdentity(BaseUBAgent):
+    def __init__(self, **kwargs):
+        super().__init__(
+            instructions=(
+                "You just greeted the caller. Listen for their response.\n"
+                "- If they confirm they are the right person and say 'fine' etc., call identity_confirmed.\n"
+                "- If wrong person, call wrong_person.\n"
+                "- If they're busy (busy, baad me, class chal rahi), call person_busy.\n"
+                "- If not interested, call not_interested.\n"
+                "- If they ask 'where did you get my number' or 'are you AI', call handle_objection.\n"
+                "Do NOT speak — only call tools."
+            ),
+            **kwargs,
+        )
+
+    async def on_enter(self) -> None:
         await self.say_script(S1_GREETING)
 
     @function_tool
-    async def identity_confirmed(self, context: RunCtx, response: str = "ok") -> "Step2_Recall":
-        """Person confirmed identity."""
+    async def identity_confirmed(self, context: RunCtx, response: str = "confirmed") -> "Step2_Recall":
         return Step2_Recall()
 
     @function_tool
-    async def wrong_person(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
-        """Wrong person."""
-        from agents.shared.closer import CloserAgent
+    async def wrong_person(self, context: RunCtx, response: str = "wrong") -> BaseUBAgent:
+        await self.say_script("Oh sorry, शायद wrong number लग गया। Have a great day!")
         return CloserAgent(tag="Wrong Contact")
 
     @function_tool
-    async def person_busy(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
-        """Person is busy."""
-        from agents.shared.scheduler import SchedulerAgent
+    async def not_interested(self, context: RunCtx, response: str = "no") -> BaseUBAgent:
+        await self.say_script(S_NOT_INTERESTED)
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> BaseUBAgent:
+        await self.say_script(S_BUSY)
         return SchedulerAgent()
 
     @function_tool
-    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
-        """Objection raised."""
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> BaseUBAgent:
         if "number" in objection.lower() or "kahan" in objection.lower():
             await self.say_script(S_NUMBER_SOURCE)
         else:
@@ -143,94 +145,145 @@ class Step1_Greet(BaseUBAgent):
         return ObjectionAgent(return_agent=Step2_Recall())
 
 
-class Step2_Recall(BaseUBAgent):
-    """Step 2: Recall past conversation + Step 3: Ask if checked."""
+# ═══════════════════════════════════════════════════════════════
+# STEP 2 & 3: RECALL PAST CHAT & ASK IF SEEN
+# ═══════════════════════════════════════════════════════════════
 
+class Step2_Recall(BaseUBAgent):
     def __init__(self, **kwargs):
         super().__init__(
             instructions=(
-                "You recalled the past conversation and asked if they checked the files. "
-                "Listen for their response.\n"
-                "- If they HAVE seen the files and share feedback, call sample_seen.\n"
-                "- If they have NOT seen the files yet, call sample_not_seen.\n"
-                "- If they ask 'where did you get my number' or 'are you AI', "
-                "call handle_objection.\n"
-                "Do NOT speak."
+                "You asked if they checked the whatsapp sample.\n"
+                "ROUTING RULES:\n"
+                "- If NOT SEEN (nahi dekha, time nahi mila), call files_not_seen.\n"
+                "- If SEEN (haan dekhi, achi hai), call files_seen.\n"
+                "- If busy, call person_busy.\n"
+                "- If not interested, call not_interested.\n"
+                "- If objection, call handle_objection.\n"
             ),
             **kwargs,
         )
 
     async def on_enter(self) -> None:
-        await self.say_script(S2_RECALL)
-        await self.say_script(S3_FOLLOWUP)
+        await self.say_script(f"{S2_RECALL} {S3_FOLLOW_UP}")
 
     @function_tool
-    async def sample_seen(self, context: RunCtx, response: str = "ok") -> "Step5_NextSteps":
-        """Person has seen the digital sample and is sharing feedback."""
-        await self.say_script(S4_FEEDBACK_ACK)
-        return Step5_NextSteps()
-
-    @function_tool
-    async def sample_not_seen(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
-        """Person has NOT seen the files yet."""
+    async def files_not_seen(self, context: RunCtx, response: str = "no") -> BaseUBAgent:
+        """They haven't seen the files. Resend and close."""
+        ud = context.userdata
+        if N8N_WHATSAPP_SAMPLE_WEBHOOK_URL:
+            asyncio.create_task(httpx.AsyncClient().post(N8N_WHATSAPP_SAMPLE_WEBHOOK_URL, json={
+                "phone": ud.phone_number,
+                "name": ud.caller_name,
+                "call_type": ud.call_type.value,
+                "call_id": ud.call_id,
+            }))
         await self.say_script(S4_NOT_SEEN)
-        from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back", notes="Reshared digital sample")
+        return CloserAgent(tag="Sample Resent")
 
     @function_tool
-    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
-        """Objection raised."""
-        if "number" in objection.lower() or "kahan" in objection.lower():
-            await self.say_script(S_NUMBER_SOURCE)
-        else:
-            await self.say_script(S_AI_RESPONSE)
-        return ObjectionAgent(return_agent=Step2_Recall())
+    async def files_seen(self, context: RunCtx, response: str = "yes") -> "Step4_Feedback":
+        """They saw the files. Ask for feedback."""
+        # If they already gave their feedback eagerly, we skip step 4 and go to 5? 
+        # But let's just transition to Step4 to formalize.
+        return Step4_Feedback()
+
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "no") -> BaseUBAgent:
+        await self.say_script(S_NOT_INTERESTED)
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> BaseUBAgent:
+        await self.say_script(S_BUSY)
+        return SchedulerAgent()
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> BaseUBAgent:
+        await self.say_script(S_NUMBER_SOURCE if "number" in objection.lower() or "kahan" in objection.lower() else S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_ListenRecall())
 
 
-class Step5_NextSteps(BaseUBAgent):
-    """Step 5: Next steps based on interest level."""
-
+class Step2_ListenRecall(BaseUBAgent):
+    """Silent listener if an objection interrupts Step 2."""
     def __init__(self, **kwargs):
         super().__init__(
             instructions=(
-                "The teacher gave feedback. Listen for their next intent.\n"
-                "- If they ask for more details, pricing, want a visit, or want to order — "
-                "call interested.\n"
-                "- If hesitant (dekhte hai, sochte hai, abhi nahi) — call hesitant.\n"
-                "- If clearly not interested — call not_interested.\n"
-                "- If they ask 'where did you get my number' or 'are you AI', "
-                "call handle_objection.\n"
-                "Do NOT speak."
+                "You are waiting for them to say if they checked the files.\n"
+                "- If NOT SEEN, call files_not_seen.\n"
+                "- If SEEN, call files_seen.\n"
+                "- If busy, call person_busy.\n"
+                "- If not interested, call not_interested.\n"
             ),
             **kwargs,
         )
 
-    @function_tool
-    async def interested(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
-        """Person wants more details, pricing, order, or visit."""
-        await self.say_script(S5_INTERESTED)
-        from agents.shared.scheduler import SchedulerAgent
-        return SchedulerAgent()
+    async def on_enter(self) -> None:
+        pass
 
     @function_tool
-    async def hesitant(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
-        """Person is hesitant."""
-        await self.say_script(S5_HESITANT)
-        from agents.shared.closer import CloserAgent
-        return CloserAgent(tag="Call Back")
+    async def files_not_seen(self, context: RunCtx, response: str = "no") -> BaseUBAgent:
+        ud = context.userdata
+        if N8N_WHATSAPP_SAMPLE_WEBHOOK_URL:
+            asyncio.create_task(httpx.AsyncClient().post(N8N_WHATSAPP_SAMPLE_WEBHOOK_URL, json={"phone": ud.phone_number, "call_type": ud.call_type.value}))
+        await self.say_script(S4_NOT_SEEN)
+        return CloserAgent(tag="Sample Resent")
 
     @function_tool
-    async def not_interested(self, context: RunCtx, response: str = "ok") -> "BaseUBAgent":
-        """Person is not interested."""
-        await self.say_script(S5_NOT_INTERESTED)
-        from agents.shared.closer import CloserAgent
+    async def files_seen(self, context: RunCtx, response: str = "yes") -> "Step4_Feedback":
+        return Step4_Feedback()
+
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "no") -> BaseUBAgent:
+        await self.say_script(S_NOT_INTERESTED)
         return CloserAgent(tag="Not Interested")
 
     @function_tool
-    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> "BaseUBAgent":
-        """Objection raised."""
-        if "number" in objection.lower() or "kahan" in objection.lower():
-            await self.say_script(S_NUMBER_SOURCE)
-        else:
-            await self.say_script(S_AI_RESPONSE)
-        return ObjectionAgent(return_agent=Step5_NextSteps())
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> BaseUBAgent:
+        await self.say_script(S_BUSY)
+        return SchedulerAgent()
+
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 4: SEEN -> GET FEEDBACK
+# ═══════════════════════════════════════════════════════════════
+
+class Step4_Feedback(BaseUBAgent):
+    def __init__(self, **kwargs):
+        super().__init__(
+            instructions=(
+                "You asked for their feedback. Listen closely.\n"
+                "Based on their intent:\n"
+                "- If POSITIVE (acha hai, price kya hai, book chaiye, send full sample), call details_positive.\n"
+                "- If HESITANT (dekhte hai, abhi decide nahi kiya), call details_hesitant.\n"
+                "- If NOT INTERESTED (bekar hai, nahi chahiye), call not_interested.\n"
+                "- If busy, call person_busy.\n"
+            ),
+            **kwargs,
+        )
+
+    async def on_enter(self) -> None:
+        await self.say_script(S4_SEEN_ASK)
+
+    @function_tool
+    async def details_positive(self, context: RunCtx, review: str = "good") -> BaseUBAgent:
+        """They liked it and want next steps."""
+        await self.say_script(f"{S4_SEEN_THANK} {S5_POSITIVE}")
+        return SchedulerAgent()
+
+    @function_tool
+    async def details_hesitant(self, context: RunCtx, review: str = "unsure") -> BaseUBAgent:
+        """They are hesitant."""
+        await self.say_script(f"{S4_SEEN_THANK} {S5_HESITANT}")
+        return CloserAgent(tag="Follow Up Later")
+
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "no") -> BaseUBAgent:
+        """They are explicitly not interested."""
+        await self.say_script(S_NOT_INTERESTED)
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> BaseUBAgent:
+        await self.say_script(S_BUSY)
+        return SchedulerAgent()

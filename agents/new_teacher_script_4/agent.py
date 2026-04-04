@@ -40,11 +40,20 @@ class ObjectionAgent(BaseUBAgent):
 class Step1_Greet(BaseUBAgent):
     def __init__(self, **kwargs):
         super().__init__(
-            instructions="Wait silently for the caller to pick up and speak. When they speak, call `caller_picked_up`.",
+            instructions=(
+                "You just said 'Hello?'. Listen carefully for the person to speak.
+"
+                "When the person replies (hello, haan, ji, boliye, ha, etc.), "
+                "call `caller_picked_up` IMMEDIATELY.
+"
+                "Do NOT generate any speech. ONLY call the tool."
+            ),
             **kwargs,
         )
+
     async def on_enter(self) -> None:
-        logger.info("Script 4 | Waiting for caller...")
+        await self.say_script("Hello?")
+
     @function_tool
     async def caller_picked_up(self, context: RunCtx, response: str = "hello") -> "Step1b_ConfirmIdentity":
         return Step1b_ConfirmIdentity()
@@ -64,7 +73,7 @@ class Step1b_ConfirmIdentity(BaseUBAgent):
     async def on_enter(self) -> None:
         await self.say_script(S1_GREETING)
     @function_tool
-    async def identity_confirmed(self, context: RunCtx, response: str = "confirmed") -> "Step2_Intro": return Step2_Intro()
+    async def identity_confirmed(self, context: RunCtx, response: str = "confirmed") -> "Step2_Intro": return Step2_ListenClasses()
     @function_tool
     async def wrong_person(self, context: RunCtx, response: str = "wrong") -> BaseUBAgent:
         await self.say_script(S_WRONG_PERSON)
@@ -76,7 +85,7 @@ class Step1b_ConfirmIdentity(BaseUBAgent):
     @function_tool
     async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> BaseUBAgent:
         await self.say_script(S_NUMBER_SOURCE if "number" in objection.lower() or "kahan" in objection.lower() else S_AI_RESPONSE)
-        return ObjectionAgent(return_agent=Step2_Intro())
+        return ObjectionAgent(return_agent=Step2_ListenClasses())
 
 class Step2_Intro(BaseUBAgent):
     def __init__(self, **kwargs):
@@ -98,14 +107,14 @@ class Step2_Intro(BaseUBAgent):
         ud = context.userdata
         if classes_and_exams.strip().lower() in {"ji", "jee", "haan", "ha", "ok", "theek hai"} or len(classes_and_exams.strip()) <= 3:
             await self.say_script("जी सर, मतलब आपके यहाँ कौन सी classes चलती हैं?")
-            return Step2_Intro()
+            return Step2_ListenClasses()
         ud.exam_type = classes_and_exams
         if ud.tracker: ud.tracker.log_function("set_exam_type", {"exam": classes_and_exams})
         return Step3_ShareSample()
     @function_tool
     async def unclear_response(self, context: RunCtx, what_they_said: str = "unclear") -> "Step2_Intro":
         await self.say_script("जी सर, मतलब specifically कौन सी classes चलती हैं? six to eight, nine ten या eleven twelve?")
-        return Step2_Intro()
+        return Step2_ListenClasses()
     @function_tool
     async def person_busy(self, context: RunCtx, response: str = "busy") -> BaseUBAgent:
         await self.say_script(S_BUSY)
@@ -117,7 +126,56 @@ class Step2_Intro(BaseUBAgent):
     @function_tool
     async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> BaseUBAgent:
         await self.say_script(S_NUMBER_SOURCE if "number" in objection.lower() or "kahan" in objection.lower() else S_AI_RESPONSE)
-        return ObjectionAgent(return_agent=Step2_Intro())
+        return ObjectionAgent(return_agent=Step2_ListenClasses())
+
+
+class Step2_ListenClasses(BaseUBAgent):
+    def __init__(self, **kwargs):
+        super().__init__(
+            instructions=(
+                 "You are waiting for the teacher to answer what classes they teach.\n"
+                 "ROUTING RULES (follow strictly):\n"
+                 "1. If they mention SPECIFIC classes/exams (e.g. 'NEET', '9th to 12th', 'JEE'), call classes_shared.\n"
+                 "2. If their answer is VAGUE or UNCLEAR, call unclear_response.\n"
+                 "3. If they say they are busy, call person_busy.\n"
+                 "4. If they say they are NOT interested (nahi chahiye, interest nahi, no), call not_interested.\n"
+                 "5. If they ask 'where did you get my number', call handle_objection.\n"
+            ),
+            **kwargs,
+        )
+
+    async def on_enter(self) -> None:
+        pass  # NO SPEECH
+
+    @function_tool
+    async def classes_shared(self, context: RunCtx, classes_and_exams: str) -> "Step3_ShareSample":
+        ud = context.userdata
+        if classes_and_exams.strip().lower() in {"ji", "jee", "haan", "ha", "ok", "theek hai"} or len(classes_and_exams.strip()) <= 3:
+            await self.say_script("जी सर, मतलब आपके यहाँ कौन सी classes चलती हैं?")
+            return Step2_ListenClasses()
+        ud.exam_type = classes_and_exams
+        if ud.tracker: ud.tracker.log_function("set_exam_type", {"exam": classes_and_exams})
+        return Step3_ShareSample()
+
+    @function_tool
+    async def unclear_response(self, context: RunCtx, what_they_said: str = "unclear") -> "Step2_ListenClasses":
+        await self.say_script("जी सर, मतलब specifically कौन सी classes चलती हैं आपके यहाँ?")
+        return Step2_ListenClasses()
+
+    @function_tool
+    async def person_busy(self, context: RunCtx, response: str = "busy") -> BaseUBAgent:
+        await self.say_script(S_BUSY)
+        return SchedulerAgent()
+
+    @function_tool
+    async def not_interested(self, context: RunCtx, response: str = "no") -> BaseUBAgent:
+        await self.say_script(S_NOT_INTERESTED)
+        return CloserAgent(tag="Not Interested")
+
+    @function_tool
+    async def handle_objection(self, context: RunCtx, objection: str = "unknown") -> BaseUBAgent:
+        await self.say_script(S_NUMBER_SOURCE if "number" in objection.lower() or "kahan" in objection.lower() else S_AI_RESPONSE)
+        return ObjectionAgent(return_agent=Step2_ListenClasses())
 
 class Step3_ShareSample(BaseUBAgent):
     def __init__(self, **kwargs):
