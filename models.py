@@ -12,44 +12,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 
-# ═══════════════════════════════════════════════════════════════
-# CALL TYPES — all supported outbound call categories
-# ═══════════════════════════════════════════════════════════════
 
-class CallType(str, Enum):
-    """Every supported call type. Value is the API string from N8N."""
-    NEW_TEACHER_COACHING       = "new_teacher_coaching"
-    NEW_TEACHER_TUITION        = "new_teacher_tuition"
-    NEW_TEACHER_SCRIPT_1       = "new_teacher_script_1"
-    NEW_TEACHER_SCRIPT_2       = "new_teacher_script_2"
-    NEW_TEACHER_SCRIPT_3       = "new_teacher_script_3"
-    NEW_TEACHER_SCRIPT_4       = "new_teacher_script_4"
-    FOLLOWUP_DIGITAL_SAMPLE_1  = "followup_digital_sample_1"
-    FOLLOWUP_DIGITAL_SAMPLE_2  = "followup_digital_sample_2"
-    FOLLOWUP_PHYSICAL_SAMPLE_1 = "followup_physical_sample_1"
-    FOLLOWUP_PHYSICAL_SAMPLE_2 = "followup_physical_sample_2"
-    FOLLOWUP_VISIT             = "followup_visit"
-    CONTACTED_PHYSICALLY       = "contacted_physically"
-    CONTACTED_CALL             = "contacted_call"
-    REFERRAL                   = "referral"
-
-
-def call_type_from_string(s: str) -> CallType:
-    """Resolve a call_type string to enum. Falls back to NEW_TEACHER_COACHING."""
-    s = s.strip().lower()
-    for ct in CallType:
-        if ct.value == s:
-            return ct
-    # Legacy compat: "name" → tuition, "institution" → coaching
-    if s == "name":
-        return CallType.NEW_TEACHER_TUITION
-    if s == "institution":
-        return CallType.NEW_TEACHER_COACHING
-    if s == "new_teacher_script_1" or s == "script_1": return CallType.NEW_TEACHER_SCRIPT_1
-    if s == "new_teacher_script_2" or s == "script_2": return CallType.NEW_TEACHER_SCRIPT_2
-    if s == "new_teacher_script_3" or s == "script_3": return CallType.NEW_TEACHER_SCRIPT_3
-    if s == "new_teacher_script_4" or s == "script_4": return CallType.NEW_TEACHER_SCRIPT_4
-    return CallType.NEW_TEACHER_COACHING
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -97,11 +60,8 @@ def get_random_voice() -> VoiceProfile:
 @dataclass
 class CallUserData:
     """Shared state across all agents in a single call session."""
-    # Caller identity
     caller_name: str = "Prakash"
     phone_number: str = ""
-    call_type: CallType = CallType.NEW_TEACHER_COACHING
-    call_client_type: str = "teacher"  # "teacher" or "institution"
 
     # Voice for this call
     voice: Optional[VoiceProfile] = None
@@ -128,7 +88,6 @@ class CallUserData:
         return {
             "agent_name": v.name,
             "caller_name": self.caller_name,
-            "call_type": self.call_type.value,
             "bol_raha": v.bol_raha,
             "le_sakta": v.le_sakta,
             "chahta": v.chahta,

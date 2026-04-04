@@ -58,8 +58,6 @@ class CallRequest(BaseModel):
     """
     name: str
     phone_number: str
-    call_type: str = "new_teacher_coaching"
-    call_client_type: str = "teacher"
 
 
 # ─── Health Check ────────────────────────────────────────────
@@ -87,16 +85,14 @@ async def make_outbound_call(req: CallRequest):
     ts = int(time.time())
     room_name = f"call_{phone.replace('+', '')}_{ts}"
 
-    # Room metadata — the agent reads this to pick the right flow
+        # Room metadata — the agent reads this to pick the right flow
     import json
     metadata = json.dumps({
         "name": req.name,
         "phone_number": phone,
-        "call_type": req.call_type,
-        "call_client_type": req.call_client_type,
     })
 
-    logger.info(f"CALL REQUEST | {req.name} | {phone} | type={req.call_type}")
+    logger.info(f"CALL REQUEST | {req.name} | {phone}")
 
     try:
         api = LiveKitAPI(
@@ -127,8 +123,6 @@ async def make_outbound_call(req: CallRequest):
             "status": "ok",
             "room_name": room_name,
             "phone": phone,
-            "call_type": req.call_type,
-            "call_client_type": req.call_client_type,
         }
 
     except Exception as e:

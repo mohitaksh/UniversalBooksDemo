@@ -65,63 +65,10 @@ logger = logging.getLogger("main_agent")
 # CALL TYPE → ENTRY AGENT MAPPING
 # ═══════════════════════════════════════════════════════════════
 
-def get_entry_agent(call_type: CallType):
-    """Returns the entry agent class for the given call type."""
-    if call_type in (CallType.NEW_TEACHER_COACHING, CallType.NEW_TEACHER_TUITION):
-        from agents.new_teacher.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.NEW_TEACHER_SCRIPT_1:
-        from agents.new_teacher_script_1.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.NEW_TEACHER_SCRIPT_2:
-        from agents.new_teacher_script_2.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.NEW_TEACHER_SCRIPT_3:
-        from agents.new_teacher_script_3.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.NEW_TEACHER_SCRIPT_4:
-        from agents.new_teacher_script_4.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.FOLLOWUP_DIGITAL_SAMPLE_1:
-        from agents.digital_sample.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.FOLLOWUP_DIGITAL_SAMPLE_2:
-        from agents.digital_sample_2.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.FOLLOWUP_PHYSICAL_SAMPLE_1:
-        from agents.physical_sample.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.FOLLOWUP_PHYSICAL_SAMPLE_2:
-        from agents.physical_sample_2.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.FOLLOWUP_VISIT:
-        from agents.visit_followup.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.CONTACTED_PHYSICALLY:
-        from agents.contacted_physically.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.CONTACTED_CALL:
-        from agents.contacted_call.agent import Step1_Greet
-        return Step1_Greet
-
-    elif call_type == CallType.REFERRAL:
-        from agents.referral.agent import Step1_Greet
-        return Step1_Greet
-
-    else:
-        from agents.new_teacher.agent import Step1_Greet
-        return Step1_Greet
+def get_entry_agent():
+    """Returns the entry agent class."""
+    from agent import Step1_Greet
+    return Step1_Greet
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -132,13 +79,9 @@ async def entrypoint(ctx: JobContext):
     """Main entrypoint — dispatched by LiveKit when agent joins a room."""
 
     # ── Read metadata ────────────────────────────────────────
-    # Server puts metadata on the ROOM (CreateRoomRequest.metadata),
-    # so we read ctx.room.metadata.  ctx.job.metadata is only populated
-    # when using explicit AgentDispatch — try it first as a fallback.
+    # Server puts metadata on the ROOM (CreateRoomRequest.metadata)
     caller_name = "Prakash"
     phone_number = ""
-    call_type_str = "new_teacher_coaching"
-    call_client_type = "teacher"
 
     # Connect first so ctx.room.metadata is available
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
@@ -152,13 +95,10 @@ async def entrypoint(ctx: JobContext):
             raw = ctx.room.metadata or ""
             meta = json.loads(raw) if raw.strip() else {}
         caller_name = meta.get("name", "sir") or "sir"
-        call_type_str = meta.get("call_type", "new_teacher_coaching") or "new_teacher_coaching"
         phone_number = meta.get("phone_number", meta.get("phone", "")) or ""
-        call_client_type = meta.get("call_client_type", "teacher") or "teacher"
     except Exception as e:
         logging.getLogger("entrypoint").warning(f"Metadata parse error: {e}")
 
-    call_type = call_type_from_string(call_type_str)
     voice = get_random_voice()
 
     # ── Build shared call state ──────────────────────────────
@@ -171,15 +111,13 @@ async def entrypoint(ctx: JobContext):
 
     full_log.info("=" * 60)
     full_log.info(f"📞 NEW CALL | ID: {call_id} | Room: {ctx.room.name}")
-    full_log.info(f"📋 Type: {call_type_str} | Name: {caller_name} | Phone: {phone_number}")
+    full_log.info(f"📋 Name: {caller_name} | Phone: {phone_number}")
     full_log.info("=" * 60)
-    brief_log.info(f"CALL_START | {call_id} | type={call_type_str} | name={caller_name}")
+    brief_log.info(f"CALL_START | {call_id} | name={caller_name}")
 
     userdata = CallUserData(
         caller_name=caller_name,
         phone_number=phone_number,
-        call_type=call_type,
-        call_client_type=call_client_type,
         voice=voice,
         tracker=tracker,
         call_id=call_id,
@@ -187,7 +125,7 @@ async def entrypoint(ctx: JobContext):
     )
 
     # ── Pick the right entry agent ───────────────────────────
-    EntryAgent = get_entry_agent(call_type)
+    EntryAgent = get_entry_agent()
     entry_agent = EntryAgent()
 
     # ── TTS / STT / LLM — matching working code exactly ─────
