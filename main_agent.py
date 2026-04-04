@@ -71,6 +71,22 @@ def get_entry_agent(call_type: CallType):
         from agents.new_teacher.agent import Step1_Greet
         return Step1_Greet
 
+    elif call_type == CallType.NEW_TEACHER_SCRIPT_1:
+        from agents.new_teacher_script_1.agent import Step1_Greet
+        return Step1_Greet
+
+    elif call_type == CallType.NEW_TEACHER_SCRIPT_2:
+        from agents.new_teacher_script_2.agent import Step1_Greet
+        return Step1_Greet
+
+    elif call_type == CallType.NEW_TEACHER_SCRIPT_3:
+        from agents.new_teacher_script_3.agent import Step1_Greet
+        return Step1_Greet
+
+    elif call_type == CallType.NEW_TEACHER_SCRIPT_4:
+        from agents.new_teacher_script_4.agent import Step1_Greet
+        return Step1_Greet
+
     elif call_type == CallType.FOLLOWUP_DIGITAL_SAMPLE_1:
         from agents.digital_sample.agent import Step1_Greet
         return Step1_Greet
@@ -315,8 +331,18 @@ async def entrypoint(ctx: JobContext):
 
     cost_task = asyncio.create_task(periodic_cost_log())
 
-    # ── Cleanup (uses session 'close' event — fires reliably on session.shutdown(),
-    #    participant disconnect, room delete, etc.) ──
+    # ── Cleanup ────────────────────────────────────────────────
+
+    # Safety net: if the SIP participant hangs up, force-shutdown the session.
+    # close_on_disconnect SHOULD do this automatically, but some SIP providers
+    # don't send proper disconnect signals, leaving zombie sessions.
+    @ctx.room.on("participant_disconnected")
+    def on_participant_left(participant):
+        full_log.info(f"Participant left: {participant.identity} — forcing session shutdown")
+        session.shutdown()
+
+    # Session 'close' event — fires on session.shutdown(), participant disconnect,
+    # room delete, etc. This is where we write final reports.
     @session.on("close")
     def on_session_close():
         full_log.info("Session closing — writing final reports.")

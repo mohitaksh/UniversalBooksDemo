@@ -99,7 +99,7 @@ S2_INTRO = (
 )
 
 S2_ASK_PERMISSION = (
-    "जी हा, हम उन्ही बुक्स के पब्लिशर हैं ... और अब हम class sixth se twelfth tak ke liye CBSE, जे ई ई और Neet के लिए, Exam Preparation material बनाते हैं ... content हर साल updated रहता है और material पर हम आपकी coaching कि खुद कि branding लगा के देते हैं, बिना किसी extra charges के। और best बात यह है कि हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं .. और .. इसी वजह से हम directly सीधे आप लोगों से ही बात करना चाहते हैं ... तो क्या आप हमसे बस दो मिनट बात कर सकते हैं?"
+    "जी हा, हम उन्ही बुक्स के पब्लिशर हैं ... और अब हम CBSE, Neet और जे-ई-ई के लिए, Exam Preparation material बनाते हैं ... content हर साल updated रहता है और material पर हम आपकी खुद कि branding लगा के देते हैं, बिना किसी extra charges के। और best बात यह है कि हमारी books मार्केट मे मिलने वाली books से बोहत अलग हैं .. और .. इसी वजह से हम directly सीधे आप लोगों से ही बात करना चाहते हैं ... तो क्या आप हमसे बस दो मिनट बात कर सकते हैं?"
 )
 
 S2_INTRO_MORE_THEN_ASK_PERMISSION = (
@@ -121,10 +121,10 @@ S3_ASK_CLASSES = (
 # ═══════════════════════════════════════════════════════════════
 
 S45_AI_INSTRUCTION = (
-    """Based on the product data below, share 2-3 key highlights NATURALLY 
+    """Based on the product data below, share 1-2 key highlights NATURALLY 
     in Hinglish. Be specific — mention subject names, number of questions, 
     unique features. Use the provided scripts to answer.
-    After sharing, call offer_sample.
+    After sharing, ask in the end - "क्या मैं आपको WhatsApp पर एक sample भेज सकता हूँ?"
     """
 )
 

@@ -20,6 +20,10 @@ class CallType(str, Enum):
     """Every supported call type. Value is the API string from N8N."""
     NEW_TEACHER_COACHING       = "new_teacher_coaching"
     NEW_TEACHER_TUITION        = "new_teacher_tuition"
+    NEW_TEACHER_SCRIPT_1       = "new_teacher_script_1"
+    NEW_TEACHER_SCRIPT_2       = "new_teacher_script_2"
+    NEW_TEACHER_SCRIPT_3       = "new_teacher_script_3"
+    NEW_TEACHER_SCRIPT_4       = "new_teacher_script_4"
     FOLLOWUP_DIGITAL_SAMPLE_1  = "followup_digital_sample_1"
     FOLLOWUP_DIGITAL_SAMPLE_2  = "followup_digital_sample_2"
     FOLLOWUP_PHYSICAL_SAMPLE_1 = "followup_physical_sample_1"
@@ -41,6 +45,10 @@ def call_type_from_string(s: str) -> CallType:
         return CallType.NEW_TEACHER_TUITION
     if s == "institution":
         return CallType.NEW_TEACHER_COACHING
+    if s == "new_teacher_script_1" or s == "script_1": return CallType.NEW_TEACHER_SCRIPT_1
+    if s == "new_teacher_script_2" or s == "script_2": return CallType.NEW_TEACHER_SCRIPT_2
+    if s == "new_teacher_script_3" or s == "script_3": return CallType.NEW_TEACHER_SCRIPT_3
+    if s == "new_teacher_script_4" or s == "script_4": return CallType.NEW_TEACHER_SCRIPT_4
     return CallType.NEW_TEACHER_COACHING
 
 
